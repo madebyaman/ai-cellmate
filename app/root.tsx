@@ -1,29 +1,64 @@
 import {
+  data,
   isRouteErrorResponse,
   Links,
   Meta,
   Outlet,
   Scripts,
   ScrollRestoration,
-} from "react-router";
+  useLoaderData,
+  type LoaderFunctionArgs,
+} from 'react-router';
+import { csrf } from './utils/csrf.server';
 
-import type { Route } from "./+types/root";
-import "./app.css";
+import type { Route } from './+types/root';
+import './app.css';
+import { honeypot } from './utils/honeypot.server';
+import { getToast } from './utils/toast.server';
+import { combineHeaders } from './utils/misc';
+import { HoneypotProvider } from 'remix-utils/honeypot/react';
+import { AuthenticityTokenProvider } from 'remix-utils/csrf/react';
 
 export const links: Route.LinksFunction = () => [
-  { rel: "preconnect", href: "https://fonts.googleapis.com" },
+  { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
   {
-    rel: "preconnect",
-    href: "https://fonts.gstatic.com",
-    crossOrigin: "anonymous",
+    rel: 'preconnect',
+    href: 'https://fonts.gstatic.com',
+    crossOrigin: 'anonymous',
   },
   {
-    rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    rel: 'stylesheet',
+    href: 'https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap',
   },
 ];
 
-export function Layout({ children }: { children: React.ReactNode }) {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const [csrfToken, csrfCookieHeader] = await csrf.commitToken(request);
+  const honeyProps = await honeypot.getInputProps();
+  const { toast, headers: toastHeaders } = await getToast(request);
+  return data(
+    {
+      ENV: process.env.NODE_ENV,
+      csrfToken,
+      honeyProps,
+      toast,
+    },
+    {
+      headers: combineHeaders(
+        csrfCookieHeader ? { 'set-cookie': csrfCookieHeader } : null,
+        toastHeaders
+      ),
+    }
+  );
+}
+
+function Layout({
+  children,
+  env,
+}: {
+  children: React.ReactNode;
+  env: string | undefined;
+}) {
   return (
     <html lang="en">
       <head>
@@ -34,6 +69,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {children}
+        {/* <Toaster richColors closeButton position="top-center" /> */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `window.ENV = ${JSON.stringify(env)}`,
+          }}
+        />
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -42,19 +83,31 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  return <Outlet />;
+  const data = useLoaderData<typeof loader>();
+
+  return (
+    <HoneypotProvider {...data.honeyProps}>
+      <AuthenticityTokenProvider token={data.csrfToken}>
+        <Layout env={data.ENV}>
+          <Outlet />
+          <div id="root"></div>
+          {/* {data.toast ? <ShowToast toast={data.toast} /> : null} */}
+        </Layout>
+      </AuthenticityTokenProvider>
+    </HoneypotProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
-  let message = "Oops!";
-  let details = "An unexpected error occurred.";
+  let message = 'Oops!';
+  let details = 'An unexpected error occurred.';
   let stack: string | undefined;
 
   if (isRouteErrorResponse(error)) {
-    message = error.status === 404 ? "404" : "Error";
+    message = error.status === 404 ? '404' : 'Error';
     details =
       error.status === 404
-        ? "The requested page could not be found."
+        ? 'The requested page could not be found.'
         : error.statusText || details;
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
