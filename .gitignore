@@ -6,3 +6,5 @@
 /build/
 
 /generated/prisma
+prisma/db/dev.db
+prisma/db/dev.db

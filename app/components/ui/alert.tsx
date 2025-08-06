@@ -27,9 +27,9 @@ export default function Alert({
 }) {
   const classes =
     type === 'info'
-      ? 'bg-blue-50 border-l-4 border-blue-400 [&_p]:text-gray-600'
+      ? 'bg-blue-50 border-l-4 border-blue-400 [&_p]:text-slate-600'
       : type === 'error'
-        ? 'bg-red-50 border-l-4 border-red-400 [&_p]:text-gray-700 [&_ul]:text-gray-700'
+        ? 'bg-red-50 border-l-4 border-red-400 [&_p]:text-slate-700 [&_ul]:text-slate-700'
         : '';
 
   return (

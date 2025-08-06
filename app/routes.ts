@@ -4,4 +4,5 @@ export default [
   index('routes/home.tsx'),
   route('login', 'routes/login.tsx'),
   route('signup', 'routes/signup.tsx'),
+  route('api/auth/:path/*', 'routes/api-auth.ts'),
 ] satisfies RouteConfig;

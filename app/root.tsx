@@ -14,10 +14,13 @@ import { csrf } from './utils/csrf.server';
 import type { Route } from './+types/root';
 import './app.css';
 import { honeypot } from './utils/honeypot.server';
-import { getToast } from './utils/toast.server';
+import { getToast, type Toast } from './utils/toast.server';
 import { combineHeaders } from './utils/misc';
 import { HoneypotProvider } from 'remix-utils/honeypot/react';
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react';
+import { Toaster, toast as showToast } from 'sonner';
+import { useEffect } from 'react';
+import { useToast } from './components/use-toast';
 
 export const links: Route.LinksFunction = () => [
   { rel: 'preconnect', href: 'https://fonts.googleapis.com' },
@@ -69,7 +72,7 @@ function Layout({
       </head>
       <body>
         {children}
-        {/* <Toaster richColors closeButton position="top-center" /> */}
+        <Toaster richColors closeButton position="top-center" />
         <script
           dangerouslySetInnerHTML={{
             __html: `window.ENV = ${JSON.stringify(env)}`,
@@ -84,6 +87,7 @@ function Layout({
 
 export default function App() {
   const data = useLoaderData<typeof loader>();
+  useToast(data.toast);
 
   return (
     <HoneypotProvider {...data.honeyProps}>
@@ -91,7 +95,6 @@ export default function App() {
         <Layout env={data.ENV}>
           <Outlet />
           <div id="root"></div>
-          {/* {data.toast ? <ShowToast toast={data.toast} /> : null} */}
         </Layout>
       </AuthenticityTokenProvider>
     </HoneypotProvider>

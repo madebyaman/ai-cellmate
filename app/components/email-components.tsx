@@ -3,11 +3,11 @@ import * as E from '@react-email/components';
 export function VerifyEmail({
   name,
   onboardingUrl,
-  otp,
+  token,
 }: {
   name?: string;
   onboardingUrl: string;
-  otp: string;
+  token: string;
 }) {
   return (
     <E.Html lang="en" dir="ltr">
@@ -26,17 +26,17 @@ export function VerifyEmail({
         <p>
           <E.Text>
             Alternatively, you can use the following OTP (One-Time Password) to
-            complete the verification process: <strong>{otp}</strong>
+            complete the verification process: <strong>{token}</strong>
           </E.Text>
         </p>
         <p>
           <E.Text>
-            OTP: <strong>{otp}</strong>
+            Token: <strong>{token}</strong>
           </E.Text>
         </p>
         <p>
           <E.Text>
-            Please note that this OTP is valid for a limited time only.
+            Please note that this token is valid for a limited time only.
           </E.Text>
         </p>
         <p>

@@ -4,19 +4,19 @@ import * as React from 'react';
 import { cn } from '~/utils/misc';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center rounded-md text-sm font-medium shadow-sm transition-colors outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
+  'inline-flex items-center justify-center rounded-md text-sm font-medium shadow-sm transition-colors outline-none focus-visible:ring-2 focus-within:ring-2 ring-indigo-400 ring-offset-1 disabled:pointer-events-none disabled:opacity-50',
   {
     variants: {
       variant: {
-        default: 'bg-primary-600 text-white hover:bg-primary-700',
+        default: 'bg-indigo-600 text-white hover:bg-indigo-700',
         destructive: 'bg-red-50 text-red-600 hover:bg-red-100 ring-red-400',
-        outline: 'border border-gray-300 bg-white hover:bg-gray-50',
+        outline: 'border border-slate-300 bg-white hover:bg-slate-50',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/80',
         ghost:
           'hover:bg-primary hover:text-accent-foreground border-none shadow-none',
-        link: 'text-primary-500 underline underline-offset-4 hover:no-underline border-none shadow-none',
-        icon: 'border rounded-full border-gray-300 text-gray-600 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-gray-300',
+        link: 'text-indigo-500 underline underline-offset-4 hover:no-underline border-none shadow-none',
+        icon: 'border rounded-full border-slate-300 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300',
       },
       size: {
         default: 'h-10 px-4 py-2',

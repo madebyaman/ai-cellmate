@@ -20,7 +20,7 @@ export default function Heading({ as, children, className }: HeadingProps) {
 
   return (
     <Tag
-      className={cn('font-bold text-gray-900', headingSizes[Tag], className)}
+      className={cn('font-bold text-slate-900', headingSizes[Tag], className)}
     >
       {children}
     </Tag>

@@ -10,7 +10,7 @@ export default function Label({ htmlFor, children, className }: LabelProps) {
   return (
     <label
       className={cn(
-        'block text-base sm:text-sm leading-6 text-medium text-gray-600',
+        'block text-base sm:text-sm leading-6 text-medium text-slate-600',
         className
       )}
       htmlFor={htmlFor}

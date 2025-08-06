@@ -4,8 +4,9 @@ import { ROUTES } from './constants';
 
 export async function requireUser(request: Request) {
   const session = await auth.api.getSession(request);
+  // console.log('session', session);
   if (!session) {
-    redirect(ROUTES.LOGIN);
+    throw redirect(ROUTES.LOGIN);
   }
   return session;
 }
@@ -13,7 +14,7 @@ export async function requireUser(request: Request) {
 export async function requireAnonymous(request: Request) {
   const session = await auth.api.getSession(request);
   if (session) {
-    redirect(ROUTES.DASHBOARD);
+    throw redirect(ROUTES.DASHBOARD);
   }
   return session;
 }
