@@ -1,13 +1,16 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react';
 import { parseWithZod } from '@conform-to/zod';
 import {
+  redirect,
   type ActionFunctionArgs,
+  type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
 import { Form, Link, useActionData, useSearchParams } from 'react-router';
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react';
 import { HoneypotInputs } from 'remix-utils/honeypot/react';
+import { toast } from 'sonner';
 import { AuthShell } from '~/components/auth-shell';
 import FormErrors from '~/components/form-errors';
 import { GeneralErrorBoundary } from '~/components/general-error-boundry';
@@ -16,46 +19,48 @@ import Checkbox from '~/components/ui/checkbox';
 import Heading from '~/components/ui/heading';
 import Input from '~/components/ui/input';
 import Label from '~/components/ui/label';
-import { auth } from '~/lib/auth.server';
+import { authClient } from '~/lib/auth-client';
 import { loginSchema } from '~/schema/login';
 import { requireAnonymous } from '~/utils/auth.server';
 import { ROUTES } from '~/utils/constants';
-import { validateCSRF } from '~/utils/csrf.server';
-import { checkHoneypot } from '~/utils/honeypot.server';
+import type { Route } from '../+types/root';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireAnonymous(request);
   return null;
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  await requireAnonymous(request);
+export async function clientAction({ request }: Route.ClientActionArgs) {
   const formData = await request.formData();
-  await validateCSRF(formData, request.headers);
-  checkHoneypot(formData);
 
   const submission = parseWithZod(formData, { schema: loginSchema });
   if (submission.status !== 'success') {
     return submission.reply();
   }
 
-  const response = await auth.api.signInEmail({
-    body: {
+  await authClient.signIn.email(
+    {
       email: submission.value.email,
       password: submission.value.password,
       rememberMe: submission.value.remember,
     },
-    asResponse: true,
-  });
-  const json = await response.json();
-  console.log(json);
-
-  return json;
+    {
+      onSuccess: (ctx) => {
+        redirect(ROUTES.DASHBOARD);
+      },
+      onError: (ctx) => {
+        console.log('error >>>>>', ctx);
+        if (ctx.error.code === 'EMAIL_NOT_VERIFIED') {
+          toast.error('Email not verified');
+        }
+      },
+    }
+  );
 }
 
-export default function LoginPage() {
+export default function LoginPage({ actionData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
-  const lastResult = useActionData<typeof action>();
+  const lastResult = actionData;
   const redirectTo = searchParams.get('redirectTo') ?? ROUTES.DASHBOARD;
   const [form, fields] = useForm({
     shouldValidate: 'onBlur',
@@ -72,15 +77,15 @@ export default function LoginPage() {
         <AuthShell.Logo />
         <Heading
           as="h1"
-          className="mt-6 text-center text-3xl font-extrabold text-gray-900"
+          className="mt-6 text-center text-3xl font-extrabold text-slate-900"
         >
           Sign in to your account
         </Heading>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        <p className="mt-2 text-center text-sm text-slate-600">
           Or{' '}
           <Link
             to="/signup"
-            className="font-medium text-primary-600 hover:text-primary-500"
+            className="font-medium text-indigo-600 hover:text-indigo-500"
           >
             start your 14-day free trial
           </Link>
@@ -121,7 +126,7 @@ export default function LoginPage() {
             />
             <Link
               to="/forgot-password"
-              className="text-sm text-primary-600 hover:text-primary-500"
+              className="text-sm text-indigo-600 hover:text-indigo-500"
             >
               Forgot your password?
             </Link>

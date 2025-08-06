@@ -3,7 +3,6 @@ import { parseWithZod } from '@conform-to/zod';
 import {
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
-  redirect,
   type MetaFunction,
 } from 'react-router';
 import { Form, useActionData, useSearchParams } from 'react-router';
@@ -22,18 +21,19 @@ import { signupSchema } from '~/schema/login';
 import { ROUTES } from '~/utils/constants';
 import { validateCSRF } from '~/utils/csrf.server';
 import { checkHoneypot } from '~/utils/honeypot.server';
+import { requireAnonymous } from '~/utils/auth.server';
+import { redirectWithToast } from '~/utils/toast.server';
 
 export async function loader({ request, context }: LoaderFunctionArgs) {
-  // await requireAnonymous(request, context);
+  await requireAnonymous(request);
   return null;
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  // await requireAnonymous(request, context);
+  await requireAnonymous(request);
   const formData = await request.formData();
   await validateCSRF(formData, request.headers);
   checkHoneypot(formData);
-  // auth.
 
   const submission = parseWithZod(formData, { schema: signupSchema });
   if (submission.status !== 'success') {
@@ -49,10 +49,36 @@ export async function action({ request }: ActionFunctionArgs) {
     },
     asResponse: true,
   });
-  const json = await response.json();
-  console.log(json);
+  if (!response.ok) {
+    if (response.status === 403) {
+      redirectWithToast(
+        ROUTES.SIGNUP,
+        {
+          type: 'message',
+          title: 'Email not verified',
+          description:
+            'Please check your email for a verification link and click on it to verify your email.',
+        },
+        new Response(null, { status: 302, headers: response.headers })
+      );
+    } else {
+      redirectWithToast(
+        ROUTES.SIGNUP,
+        {
+          type: 'error',
+          title: 'Email already in use',
+          description: 'Please use a different email address.',
+        },
+        new Response(null, { status: 302, headers: response.headers })
+      );
+    }
+  }
 
-  return json;
+  return redirectWithToast(ROUTES.DASHBOARD, {
+    type: 'success',
+    title: 'Signup successful',
+    description: 'You are now logged in.',
+  });
 }
 
 export default function Signup() {
