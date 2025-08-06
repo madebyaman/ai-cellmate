@@ -14,12 +14,11 @@ import { csrf } from './utils/csrf.server';
 import type { Route } from './+types/root';
 import './app.css';
 import { honeypot } from './utils/honeypot.server';
-import { getToast, type Toast } from './utils/toast.server';
+import { getToast } from './utils/toast.server';
 import { combineHeaders } from './utils/misc';
 import { HoneypotProvider } from 'remix-utils/honeypot/react';
 import { AuthenticityTokenProvider } from 'remix-utils/csrf/react';
-import { Toaster, toast as showToast } from 'sonner';
-import { useEffect } from 'react';
+import { Toaster } from 'sonner';
 import { useToast } from './components/use-toast';
 
 export const links: Route.LinksFunction = () => [

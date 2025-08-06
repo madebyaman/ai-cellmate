@@ -8,8 +8,18 @@ import {
 } from '~/components/email-components';
 
 export const auth = betterAuth({
-  database: prismaAdapter(prisma, { provider: 'sqlite' }),
+  database: prismaAdapter(prisma, {
+    provider: 'sqlite',
+  }),
   cookiePrefix: 'better-auth',
+  verification: {
+    disableCleanup: true,
+  },
+  rateLimit: {
+    enabled: true,
+    window: 100,
+    max: 3,
+  },
   emailAndPassword: {
     enabled: true,
     requireEmailVerification: true,
@@ -18,7 +28,9 @@ export const auth = betterAuth({
       await sendEmail({
         To: user.email,
         Subject: 'Reset your password',
-        react: <ForgotPasswordEmail onboardingUrl={url} otp={token} />,
+        // react: <ForgotPasswordEmail onboardingUrl={url} otp={token} />,
+        TextBody: `Click <a href="${url}">here</a> to reset your password.`,
+        HtmlBody: `<p>Click <a href="${url}">here</a> to reset your password.</p>`,
       });
     },
   },
@@ -32,7 +44,9 @@ export const auth = betterAuth({
       await sendEmail({
         To: user.email,
         Subject: 'Verify your email',
-        react: <VerifyEmail onboardingUrl={url} token={token} />,
+        TextBody: `Click <a href="${url}">here</a> to verify your email.`,
+        HtmlBody: `<p>Click <a href="${url}">here</a> to verify your email.</p>`,
+        // react: <VerifyEmail onboardingUrl={url} token={token} />,
       });
     },
   },

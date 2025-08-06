@@ -12,13 +12,15 @@ export default async function sendEmail({
   | { HtmlBody: string; TextBody: string; react?: never }
   | { react: ReactElement; HtmlBody?: never; TextBody?: never }
 )) {
-  console.log('sending email >>>>>', options);
   const From = 'hello@epicstack.dev';
   const email = {
     From,
     ...options,
     ...(react ? renderReactEmail(react) : {}),
   };
+  if (process.env.NODE_ENV === 'development') {
+    return { status: 'success' } as const;
+  }
   const response = await fetch('https://api.postmarkapp.com/email', {
     method: 'POST',
     headers: {

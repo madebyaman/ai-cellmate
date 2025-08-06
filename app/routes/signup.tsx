@@ -1,13 +1,15 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react';
+import { useEffect } from 'react';
 import { parseWithZod } from '@conform-to/zod';
 import {
-  type ActionFunctionArgs,
+  redirect,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form, useActionData, useSearchParams } from 'react-router';
+import { Form, useSearchParams } from 'react-router';
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react';
 import { HoneypotInputs } from 'remix-utils/honeypot/react';
+import { toast } from 'sonner';
 import { AuthShell } from '~/components/auth-shell';
 import FormErrors from '~/components/form-errors';
 import { GeneralErrorBoundary } from '~/components/general-error-boundry';
@@ -16,74 +18,59 @@ import Checkbox from '~/components/ui/checkbox';
 import Heading from '~/components/ui/heading';
 import Input from '~/components/ui/input';
 import Label from '~/components/ui/label';
-import { auth } from '~/lib/auth.server';
+import { authClient } from '~/lib/auth-client';
 import { signupSchema } from '~/schema/login';
 import { ROUTES } from '~/utils/constants';
-import { validateCSRF } from '~/utils/csrf.server';
-import { checkHoneypot } from '~/utils/honeypot.server';
 import { requireAnonymous } from '~/utils/auth.server';
-import { redirectWithToast } from '~/utils/toast.server';
+import type { Route } from '../+types/root';
 
-export async function loader({ request, context }: LoaderFunctionArgs) {
+export async function loader({ request }: LoaderFunctionArgs) {
   await requireAnonymous(request);
   return null;
 }
 
-export async function action({ request }: ActionFunctionArgs) {
-  await requireAnonymous(request);
+export async function clientAction({ request }: Route.ClientActionArgs) {
   const formData = await request.formData();
-  await validateCSRF(formData, request.headers);
-  checkHoneypot(formData);
 
   const submission = parseWithZod(formData, { schema: signupSchema });
   if (submission.status !== 'success') {
     return submission.reply();
   }
 
-  const response = await auth.api.signUpEmail({
-    body: {
+  let shouldClearForm = false;
+
+  await authClient.signUp.email(
+    {
       name: submission.value.name,
       email: submission.value.email,
       password: submission.value.password,
-      rememberMe: submission.value.remember,
     },
-    asResponse: true,
-  });
-  if (!response.ok) {
-    if (response.status === 403) {
-      redirectWithToast(
-        ROUTES.SIGNUP,
-        {
-          type: 'message',
-          title: 'Email not verified',
-          description:
-            'Please check your email for a verification link and click on it to verify your email.',
-        },
-        new Response(null, { status: 302, headers: response.headers })
-      );
-    } else {
-      redirectWithToast(
-        ROUTES.SIGNUP,
-        {
-          type: 'error',
-          title: 'Email already in use',
-          description: 'Please use a different email address.',
-        },
-        new Response(null, { status: 302, headers: response.headers })
-      );
+    {
+      onSuccess: () => {
+        redirect(ROUTES.DASHBOARD);
+      },
+      onError: (ctx) => {
+        if (ctx.error.code === 'EMAIL_NOT_VERIFIED') {
+          shouldClearForm = true;
+          toast.error('Email not verified', {
+            description:
+              'Please check your email for a verification link and click on it to verify your email.',
+          });
+        } else {
+          toast.error('Signup failed', {
+            description: 'Please try again or contact support.',
+          });
+        }
+      },
     }
-  }
+  );
 
-  return redirectWithToast(ROUTES.DASHBOARD, {
-    type: 'success',
-    title: 'Signup successful',
-    description: 'You are now logged in.',
-  });
+  return { shouldClearForm };
 }
 
-export default function Signup() {
+export default function Signup({ actionData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
-  const lastResult = useActionData<typeof action>();
+  const lastResult = actionData;
   const redirectTo = searchParams.get('redirectTo') ?? ROUTES.DASHBOARD;
   const [form, fields] = useForm({
     shouldValidate: 'onBlur',
@@ -93,6 +80,12 @@ export default function Signup() {
       return parseWithZod(formData, { schema: signupSchema });
     },
   });
+
+  useEffect(() => {
+    if ((actionData as any)?.shouldClearForm) {
+      form.reset();
+    }
+  }, [(actionData as any)?.shouldClearForm, form]);
 
   return (
     <AuthShell>

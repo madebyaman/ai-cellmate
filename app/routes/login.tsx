@@ -1,13 +1,12 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react';
+import { useEffect } from 'react';
 import { parseWithZod } from '@conform-to/zod';
 import {
   redirect,
-  type ActionFunctionArgs,
-  type ClientActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form, Link, useActionData, useSearchParams } from 'react-router';
+import { Form, Link, useSearchParams } from 'react-router';
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react';
 import { HoneypotInputs } from 'remix-utils/honeypot/react';
 import { toast } from 'sonner';
@@ -23,7 +22,7 @@ import { authClient } from '~/lib/auth-client';
 import { loginSchema } from '~/schema/login';
 import { requireAnonymous } from '~/utils/auth.server';
 import { ROUTES } from '~/utils/constants';
-import type { Route } from '../+types/root';
+import type { Route } from './+types/login';
 
 export async function loader({ request }: LoaderFunctionArgs) {
   await requireAnonymous(request);
@@ -35,8 +34,13 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
   const submission = parseWithZod(formData, { schema: loginSchema });
   if (submission.status !== 'success') {
-    return submission.reply();
+    return {
+      submission: submission.reply(),
+      shouldClearForm: false,
+    };
   }
+
+  let shouldClearForm = false;
 
   await authClient.signIn.email(
     {
@@ -45,31 +49,45 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       rememberMe: submission.value.remember,
     },
     {
-      onSuccess: (ctx) => {
+      onSuccess: () => {
         redirect(ROUTES.DASHBOARD);
       },
       onError: (ctx) => {
-        console.log('error >>>>>', ctx);
         if (ctx.error.code === 'EMAIL_NOT_VERIFIED') {
-          toast.error('Email not verified');
+          shouldClearForm = true;
+          toast.error('Email not verified', {
+            description:
+              'Please check your email for a verification link and click on it to verify your email.',
+          });
+        } else {
+          toast.error('Invalid credentials', {
+            description: 'Please check your email and password and try again.',
+          });
         }
       },
     }
   );
+
+  return { submission: null, shouldClearForm };
 }
 
 export default function LoginPage({ actionData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
-  const lastResult = actionData;
   const redirectTo = searchParams.get('redirectTo') ?? ROUTES.DASHBOARD;
   const [form, fields] = useForm({
     shouldValidate: 'onBlur',
-    lastResult,
+    lastResult: actionData?.submission,
     shouldRevalidate: 'onInput',
     onValidate({ formData }) {
       return parseWithZod(formData, { schema: loginSchema });
     },
   });
+
+  useEffect(() => {
+    if (actionData?.shouldClearForm) {
+      form.reset();
+    }
+  }, [actionData?.shouldClearForm]);
 
   return (
     <AuthShell>

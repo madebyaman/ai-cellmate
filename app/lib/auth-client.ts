@@ -1,7 +1,15 @@
-import { createAuthClient } from 'better-auth/react'; // make sure to import from better-auth/react
-import { ROUTES } from '~/utils/constants';
+import { createAuthClient } from 'better-auth/react';
 
 export const authClient = createAuthClient({
   baseURL: 'http://localhost:5173',
-  //you can pass client configuration here
+  fetchOptions: {
+    onError: async (context) => {
+      console.log('error in fetchoptions >>>>>', context);
+      const { response } = context;
+      if (response.status === 429) {
+        const retryAfter = response.headers.get('X-Retry-After');
+        console.log(`Rate limit exceeded. Retry after ${retryAfter} seconds`);
+      }
+    },
+  },
 });
