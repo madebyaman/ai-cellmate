@@ -1,9 +1,15 @@
 import { z } from 'zod';
 
-export const loginSchema = z.object({
-  email: z.string().email({ message: 'Invalid email address' }),
-  redirectTo: z.string().optional(),
-});
+export const loginSchema = z.discriminatedUnion('provider', [
+  z.object({
+    provider: z.literal('email'),
+    email: z.string().email({ message: 'Invalid email address' }),
+    redirectTo: z.string().optional(),
+  }),
+  z.object({
+    provider: z.literal('google'),
+  }),
+]);
 
 export const signupSchema = z.object({
   email: z.string().email({ message: 'Invalid email address' }),

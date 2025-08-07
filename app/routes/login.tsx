@@ -33,7 +33,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function clientAction({ request }: Route.ClientActionArgs) {
   const formData = await request.formData();
-
   const submission = parseWithZod(formData, { schema: loginSchema });
   if (submission.status !== 'success') {
     return {
@@ -42,36 +41,48 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
     };
   }
 
-  let shouldClearForm = false;
-
-  await authClient.signIn.magicLink(
-    {
-      email: submission.value.email,
+  if (submission.value.provider === 'google') {
+    authClient.signIn.social({
+      provider: 'google',
       callbackURL: ROUTES.DASHBOARD,
-    },
-    {
-      onSuccess: () => {
-        shouldClearForm = true;
-        toast.success('Check your email', {
-          duration: 5000,
-          description: (
-            <>
-              We sent you a temporary link to login. Please check your inbox at{' '}
-              <strong>{submission.value.email}</strong>.
-            </>
-          ),
-        });
-      },
-      onError: (ctx) => {
-        toast.error('Something went wrong', {
-          description:
-            'Please try again later or contact support if the problem persists.',
-        });
-      },
-    }
-  );
+    });
+    return {
+      submission: null,
+      shouldClearForm: false,
+    };
+  } else if (submission.value.provider === 'email') {
+    let shouldClearForm = false;
+    const userEmail = submission.value.email;
 
-  return { submission: null, shouldClearForm };
+    await authClient.signIn.magicLink(
+      {
+        email: userEmail,
+        callbackURL: ROUTES.DASHBOARD,
+      },
+      {
+        onSuccess: () => {
+          shouldClearForm = true;
+          toast.success('Check your email', {
+            duration: 5000,
+            description: (
+              <>
+                We sent you a temporary link to login. Please check your inbox
+                at <strong>{userEmail}</strong>.
+              </>
+            ),
+          });
+        },
+        onError: () => {
+          toast.error('Something went wrong', {
+            description:
+              'Please try again later or contact support if the problem persists.',
+          });
+        },
+      }
+    );
+
+    return { submission: null, shouldClearForm };
+  }
 }
 
 export default function LoginPage({ actionData }: Route.ComponentProps) {
@@ -117,6 +128,7 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
         >
           <AuthenticityTokenInput />
           <HoneypotInputs />
+          <input type="hidden" name="provider" value="email" />
           <FormErrors errors={form.errors} />
           <div>
             <Label htmlFor={fields.email.id} className="mb-1">
@@ -135,7 +147,8 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
 
         <AuthShell.Social>
           <div className="mt-6 grid grid-cols-2 gap-3">
-            <Form method="POST" action="/auth/google">
+            <Form method="POST">
+              <input type="hidden" name="provider" value="google" />
               <Button variant={'outline'} size={'full'}>
                 <span className="sr-only">Sign in with Google</span>
                 <svg
@@ -187,7 +200,9 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
   );
 }
 
-export const meta: MetaFunction = () => {};
+export const meta: MetaFunction = () => {
+  return [{ title: 'Login to Praise Panda' }];
+};
 
 export function ErrorBoundary() {
   return <GeneralErrorBoundary />;
