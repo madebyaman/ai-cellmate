@@ -9,6 +9,7 @@ export function Welcome() {
   return (
     <main className="flex items-center justify-center pt-16 pb-4">
       <Form method="POST" className="flex flex-col gap-4">
+        <input type="hidden" name="action" value="logout" />
         <AuthenticityTokenInput />
         <HoneypotInputs />
         <Button type="submit">Logout</Button>
