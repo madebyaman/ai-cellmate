@@ -5,8 +5,7 @@ import { createAllWorkers } from './app/queues/workers/index';
 console.log('Starting BullMQ worker...');
 
 // Get worker types from environment or default to all
-const workerTypes = process.env.WORKER_TYPES?.split(',') || ['email'];
-const workers = createAllWorkers();
+const [workers, workerTypes] = createAllWorkers();
 
 console.log(`Started ${workers.length} worker(s): ${workerTypes.join(', ')}`);
 

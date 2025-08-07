@@ -5,12 +5,14 @@ import type {
   BatchEmailJobData,
   NotificationJobData,
   ImageJobData,
+  CsvEnrichmentJobData,
 } from './types';
 
 // Queue instances
 export const emailQueue = new Queue('email', defaultQueueOptions);
 export const notificationQueue = new Queue('notification', defaultQueueOptions);
 export const imageQueue = new Queue('image', defaultQueueOptions);
+export const csvEnrichmentQueue = new Queue('csv-enrichment', defaultQueueOptions);
 
 // Job helper functions
 export async function addEmailJob(data: EmailJobData, options = {}) {
@@ -43,6 +45,16 @@ export async function addImageJob(
   options = {}
 ) {
   return await imageQueue.add(jobType, data, {
+    ...defaultJobOptions,
+    ...options,
+  });
+}
+
+export async function addCsvEnrichmentJob(
+  data: CsvEnrichmentJobData,
+  options = {}
+) {
+  return await csvEnrichmentQueue.add('enrich-csv', data, {
     ...defaultJobOptions,
     ...options,
   });

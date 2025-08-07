@@ -26,3 +26,38 @@ export interface ImageJobData {
   width?: number;
   height?: number;
 }
+
+// CSV enrichment job types
+export interface CsvEnrichmentJobData {
+  csvUrl: string;
+  enrichmentPrompt?: string;
+  outputUrl?: string;
+  userId?: string;
+}
+
+// Union types for all job data
+export type EmailJobDataUnion = EmailJobData | BatchEmailJobData;
+export type CsvEnrichmentJobDataUnion = CsvEnrichmentJobData;
+
+// Job result types
+export interface EmailJobResult {
+  success: boolean;
+  recipient: string;
+  error?: string;
+}
+
+export interface BatchEmailJobResult {
+  success: boolean;
+  totalSent: number;
+  totalFailed: number;
+  results: EmailJobResult[];
+}
+
+export interface CsvEnrichmentJobResult {
+  success: boolean;
+  originalCsvUrl: string;
+  enrichedDataPreview: string;
+  rowsProcessed: number;
+  userId?: string;
+  processedAt: string;
+}

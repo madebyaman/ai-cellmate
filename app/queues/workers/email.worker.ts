@@ -1,9 +1,9 @@
 import { Worker } from 'bullmq';
 import { redisConnection } from '../config';
-import type { EmailJobData, BatchEmailJobData } from '../types';
+import type { EmailJobData, BatchEmailJobData, EmailJobDataUnion, EmailJobResult, BatchEmailJobResult } from '../types';
 
-export function createEmailWorker() {
-  return new Worker(
+export function createEmailWorker(): Worker<EmailJobDataUnion, EmailJobResult | BatchEmailJobResult, string> {
+  return new Worker<EmailJobDataUnion, EmailJobResult | BatchEmailJobResult, string>(
     'email',
     async (job) => {
       console.log(`Processing email job: ${job.name}:${job.id}`);
@@ -21,7 +21,7 @@ export function createEmailWorker() {
   );
 }
 
-async function processSendEmail(data: EmailJobData) {
+async function processSendEmail(data: EmailJobData): Promise<EmailJobResult> {
   const { to, subject, html } = data;
 
   // Your email sending logic here
@@ -31,9 +31,9 @@ async function processSendEmail(data: EmailJobData) {
   return { success: true, recipient: to };
 }
 
-async function processBatchEmail(data: BatchEmailJobData) {
+async function processBatchEmail(data: BatchEmailJobData): Promise<BatchEmailJobResult> {
   const { recipients } = data;
-  const results = [];
+  const results: EmailJobResult[] = [];
 
   for (const recipient of recipients) {
     try {
