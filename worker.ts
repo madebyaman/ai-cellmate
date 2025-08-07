@@ -1,23 +1,23 @@
 #!/usr/bin/env tsx
 
-import { createEmailWorker } from './app/lib/queue.server.js';
+import { createAllWorkers } from './app/queues/workers/index';
 
 console.log('Starting BullMQ worker...');
 
-// Create and start the email worker
-const emailWorker = createEmailWorker();
+// Get worker types from environment or default to all
+const workerTypes = process.env.WORKER_TYPES?.split(',') || ['email'];
+const workers = createAllWorkers();
+
+console.log(`Started ${workers.length} worker(s): ${workerTypes.join(', ')}`);
 
 // Handle graceful shutdown
-process.on('SIGINT', async () => {
-  console.log('Shutting down worker...');
-  await emailWorker.close();
+const shutdown = async () => {
+  console.log('Shutting down workers...');
+  await Promise.all(workers.map((worker) => worker.close()));
   process.exit(0);
-});
+};
 
-process.on('SIGTERM', async () => {
-  console.log('Shutting down worker...');
-  await emailWorker.close();
-  process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
-console.log('Worker started successfully!');
+console.log('Workers started successfully!');
