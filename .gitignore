@@ -6,4 +6,9 @@
 /build/
 
 /generated/prisma
-prisma/db/dev.db
+*.db
+
+# Environment variables
+.env
+.env.local
+.env.production

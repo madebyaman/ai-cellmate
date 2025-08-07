@@ -1,7 +1,9 @@
+import { magicLinkClient } from 'better-auth/client/plugins';
 import { createAuthClient } from 'better-auth/react';
 
 export const authClient = createAuthClient({
   baseURL: 'http://localhost:5173',
+  plugins: [magicLinkClient()],
   fetchOptions: {
     onError: async (context) => {
       console.log('error in fetchoptions >>>>>', context);

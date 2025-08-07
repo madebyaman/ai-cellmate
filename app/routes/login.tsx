@@ -1,12 +1,14 @@
 import { getFormProps, getInputProps, useForm } from '@conform-to/react';
+import { useSpinDelay } from 'spin-delay';
 import { useEffect } from 'react';
 import { parseWithZod } from '@conform-to/zod';
 import {
   redirect,
+  useFetcher,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form, Link, useSearchParams } from 'react-router';
+import { Form, useSearchParams } from 'react-router';
 import { AuthenticityTokenInput } from 'remix-utils/csrf/react';
 import { HoneypotInputs } from 'remix-utils/honeypot/react';
 import { toast } from 'sonner';
@@ -42,28 +44,29 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
   let shouldClearForm = false;
 
-  await authClient.signIn.email(
+  await authClient.signIn.magicLink(
     {
       email: submission.value.email,
-      password: submission.value.password,
-      rememberMe: submission.value.remember,
+      callbackURL: ROUTES.DASHBOARD,
     },
     {
       onSuccess: () => {
-        redirect(ROUTES.DASHBOARD);
+        shouldClearForm = true;
+        toast.success('Check your email', {
+          duration: 5000,
+          description: (
+            <>
+              We sent you a temporary link to login. Please check your inbox at{' '}
+              <strong>{submission.value.email}</strong>.
+            </>
+          ),
+        });
       },
       onError: (ctx) => {
-        if (ctx.error.code === 'EMAIL_NOT_VERIFIED') {
-          shouldClearForm = true;
-          toast.error('Email not verified', {
-            description:
-              'Please check your email for a verification link and click on it to verify your email.',
-          });
-        } else {
-          toast.error('Invalid credentials', {
-            description: 'Please check your email and password and try again.',
-          });
-        }
+        toast.error('Something went wrong', {
+          description:
+            'Please try again later or contact support if the problem persists.',
+        });
       },
     }
   );
@@ -73,6 +76,12 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
 export default function LoginPage({ actionData }: Route.ComponentProps) {
   const [searchParams] = useSearchParams();
+  let fetcher = useFetcher();
+  let isLoading = fetcher.state !== 'idle';
+  const showSpinner = useSpinDelay(isLoading, {
+    delay: 100,
+    minDuration: 200,
+  });
   const redirectTo = searchParams.get('redirectTo') ?? ROUTES.DASHBOARD;
   const [form, fields] = useForm({
     shouldValidate: 'onBlur',
@@ -99,18 +108,9 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
         >
           Sign in to your account
         </Heading>
-        <p className="mt-2 text-center text-sm text-slate-600">
-          Or{' '}
-          <Link
-            to="/signup"
-            className="font-medium text-indigo-600 hover:text-indigo-500"
-          >
-            start your 14-day free trial
-          </Link>
-        </p>
       </AuthShell.Header>
       <AuthShell.Body>
-        <Form
+        <fetcher.Form
           className="flex flex-col gap-6 justify-center"
           method="POST"
           {...getFormProps(form)}
@@ -127,31 +127,11 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
               {...getInputProps(fields.email, { type: 'email' })}
             />
           </div>
-          <div>
-            <Label htmlFor={fields.password.id} className="mb-1">
-              Password
-            </Label>
-            <Input
-              errors={fields.password.errors}
-              {...getInputProps(fields.password, { type: 'password' })}
-            />
-          </div>
-          <div className="inline-flex justify-between">
-            <Checkbox
-              label="Remember Me"
-              errors={fields.remember.errors}
-              {...getInputProps(fields.remember, { type: 'checkbox' })}
-            />
-            <Link
-              to="/forgot-password"
-              className="text-sm text-indigo-600 hover:text-indigo-500"
-            >
-              Forgot your password?
-            </Link>
-          </div>
           <input type="hidden" name="redirect-to" value={redirectTo} />
-          <Button>Submit</Button>
-        </Form>
+          <Button type="submit" disabled={isLoading} isLoading={showSpinner}>
+            Continue with email
+          </Button>
+        </fetcher.Form>
 
         <AuthShell.Social>
           <div className="mt-6 grid grid-cols-2 gap-3">
@@ -207,9 +187,7 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
   );
 }
 
-export const meta: MetaFunction = () => {
-  return [{ title: 'Login to Praise Panda' }];
-};
+export const meta: MetaFunction = () => {};
 
 export function ErrorBoundary() {
   return <GeneralErrorBoundary />;
