@@ -19,6 +19,7 @@ export default async function sendEmail({
     ...(react ? renderReactEmail(react) : {}),
   };
   if (process.env.NODE_ENV === 'development') {
+    console.log('sending email >>>>>', options);
     return { status: 'success' } as const;
   }
   const response = await fetch('https://api.postmarkapp.com/email', {
