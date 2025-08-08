@@ -3,6 +3,7 @@ import { setTimeout } from 'node:timers/promises';
 import robotsParser from 'robots-parser';
 import TurndownService from 'turndown';
 // import { cacheWithRedis } from '~/server/redis/redis';
+import { fetchHtmlWithScrapingBee } from './scrapingbee';
 
 export const DEFAULT_MAX_RETRIES = 3;
 const MIN_DELAY_MS = 500; // 0.5 seconds
@@ -112,6 +113,7 @@ export const bulkCrawlWebsites = async (
 ): Promise<BulkCrawlResponse> => {
   const { urls, maxRetries = DEFAULT_MAX_RETRIES } = options;
 
+  console.log('[scraper] bulk crawl start', { count: urls.length, maxRetries });
   const results = await Promise.all(
     urls.map(async (url) => ({
       url,
@@ -158,22 +160,21 @@ export const crawlWebsite = async (
 
   while (attempts < maxRetries) {
     try {
-      const response = await fetch(url);
+      console.log('[scraper] attempt', { url, attempts: attempts + 1 });
+      const html = await fetchHtmlWithScrapingBee(url);
+      const articleText = extractArticleText(html);
+      console.log('[scraper] success', { url, length: articleText.length });
+      return {
+        success: true,
+        data: articleText,
+      };
 
-      if (response.ok) {
-        const html = await response.text();
-        const articleText = extractArticleText(html);
-        return {
-          success: true,
-          data: articleText,
-        };
-      }
-
+      // Note: unreachable if success above; errors are thrown and handled below
       attempts++;
       if (attempts === maxRetries) {
         return {
           success: false,
-          error: `Failed to fetch website after ${maxRetries} attempts: ${response.status} ${response.statusText}`,
+          error: `Failed to fetch website after ${maxRetries} attempts`,
         };
       }
 
@@ -182,10 +183,15 @@ export const crawlWebsite = async (
         MIN_DELAY_MS * Math.pow(2, attempts),
         MAX_DELAY_MS
       );
+      console.log('[scraper] retrying after delay', { url, delayMs: delay });
       await setTimeout(delay);
     } catch (error) {
       attempts++;
       if (attempts === maxRetries) {
+        console.error('[scraper] network error maxed', {
+          url,
+          error: error instanceof Error ? error.message : 'Unknown error',
+        });
         return {
           success: false,
           error: `Network error after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -195,6 +201,12 @@ export const crawlWebsite = async (
         MIN_DELAY_MS * Math.pow(2, attempts),
         MAX_DELAY_MS
       );
+      console.warn('[scraper] network error, backing off', {
+        url,
+        attempt: attempts,
+        delayMs: delay,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      });
       await setTimeout(delay);
     }
   }
