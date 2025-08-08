@@ -1,6 +1,8 @@
 #!/usr/bin/env tsx
 
 import { createAllWorkers } from './app/queues/workers/index';
+import { config } from 'dotenv';
+config();
 
 console.log('Starting BullMQ worker...');
 
