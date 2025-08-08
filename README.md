@@ -34,6 +34,22 @@ npm run dev
 
 Your application will be available at `http://localhost:5173`.
 
+### Environment variables
+
+Copy `.env.template` to `.env` and fill values for your LLM provider and Redis before running workers.
+
+```
+cp .env.template .env
+```
+
+### Background workers
+
+Start BullMQ workers alongside dev server (already configured in `npm run dev`):
+
+```
+npm run dev
+```
+
 ## Building for Production
 
 Create a production build:
