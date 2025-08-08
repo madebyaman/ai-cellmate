@@ -48,6 +48,7 @@ export interface CrawlOptions {
 
 export interface BulkCrawlOptions extends CrawlOptions {
   urls: string[];
+  concurrency?: number; // max number of parallel crawls
 }
 
 const turndownService = new TurndownService({
@@ -111,15 +112,20 @@ const checkRobotsTxt = async (url: string): Promise<boolean> => {
 export const bulkCrawlWebsites = async (
   options: BulkCrawlOptions
 ): Promise<BulkCrawlResponse> => {
-  const { urls, maxRetries = DEFAULT_MAX_RETRIES } = options;
+  const { urls, maxRetries = DEFAULT_MAX_RETRIES, concurrency = 5 } = options;
 
-  console.log('[scraper] bulk crawl start', { count: urls.length, maxRetries });
-  const results = await Promise.all(
-    urls.map(async (url) => ({
-      url,
-      result: await crawlWebsite({ url, maxRetries }),
-    }))
-  );
+  console.log('[scraper] bulk crawl start', {
+    count: urls.length,
+    maxRetries,
+    concurrency,
+  });
+
+  // Concurrency control
+  const { mapWithConcurrency } = await import('./concurrency');
+  const results = await mapWithConcurrency(urls, concurrency, async (url) => ({
+    url,
+    result: await crawlWebsite({ url, maxRetries }),
+  }));
 
   const allSuccessful = results.every((r) => r.result.success);
 
@@ -168,23 +174,6 @@ export const crawlWebsite = async (
         success: true,
         data: articleText,
       };
-
-      // Note: unreachable if success above; errors are thrown and handled below
-      attempts++;
-      if (attempts === maxRetries) {
-        return {
-          success: false,
-          error: `Failed to fetch website after ${maxRetries} attempts`,
-        };
-      }
-
-      // Exponential backoff: 0.5s, 1s, 2s, 4s, 8s max
-      const delay = Math.min(
-        MIN_DELAY_MS * Math.pow(2, attempts),
-        MAX_DELAY_MS
-      );
-      console.log('[scraper] retrying after delay', { url, delayMs: delay });
-      await setTimeout(delay);
     } catch (error) {
       attempts++;
       if (attempts === maxRetries) {
