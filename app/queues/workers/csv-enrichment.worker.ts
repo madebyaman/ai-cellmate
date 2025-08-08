@@ -6,6 +6,11 @@ import type {
   CsvEnrichmentJobResult,
 } from '../types';
 import { readFile } from 'fs/promises';
+import { generateObject, generateText, Output, tool } from 'ai';
+import { z } from 'zod';
+import { google } from '@ai-sdk/google';
+import { searchSerper } from '~/lib/serper';
+import { bulkCrawlWebsites } from '~/utils/scraper';
 
 export function createCsvEnrichmentWorker(): Worker<
   CsvEnrichmentJobDataUnion,
@@ -69,19 +74,101 @@ async function processCsvEnrichment(
 
     // Step 2: Parse CSV into row objects { header: value }
     const { headers, rows } = parseCsvToRowObjects(csvData);
-    console.log('CSV parsed summary', {
-      headerCount: headers.length,
-      rowCount: rows.length,
-      headers,
-      firstRow: rows[0] ?? null,
-    });
 
-    const preview = JSON.stringify(rows.slice(0, 1)[0] ?? {}, null, 2);
+    // Build a dynamic schema that mirrors the CSV row structure
+    const rowShape: Record<string, z.ZodString> = Object.fromEntries(
+      headers.map((headerName) => [headerName, z.string()])
+    ) as Record<string, z.ZodString>;
+
+    const { experimental_output } = await generateText({
+      model: google('gemini-2.0-flash'),
+      experimental_output: Output.object({
+        schema: z.object({
+          headers: z.array(z.string()),
+          rows: z.array(z.object(rowShape)),
+        }),
+      }),
+      tools: {
+        searchWeb: tool({
+          description: 'Search the web for information',
+          inputSchema: z.object({
+            query: z.string().describe('The query to search the web for'),
+          }),
+          execute: async ({ query }, { abortSignal }) => {
+            const results = await searchSerper(
+              { q: query, num: 10 },
+              abortSignal
+            );
+
+            return results.organic.map((result) => ({
+              title: result.title,
+              link: result.link,
+              snippet: result.snippet,
+              date: result.date,
+            }));
+          },
+        }),
+        scrapePages: tool({
+          description: 'Scrape the content of a list of URLs',
+          inputSchema: z.object({
+            urls: z.array(z.string()).describe('The URLs to scrape'),
+          }),
+          execute: async ({ urls }, { abortSignal }) => {
+            const results = await bulkCrawlWebsites({ urls });
+
+            if (!results.success) {
+              return {
+                error: results.error,
+                results: results.results.map(({ url, result }) => ({
+                  url,
+                  success: result.success,
+                  data: result.success ? result.data : result.error,
+                })),
+              };
+            }
+
+            return {
+              results: results.results.map(({ url, result }) => ({
+                url,
+                success: result.success,
+                data: result.data,
+              })),
+            };
+          },
+        }),
+      },
+      system: `
+    You are a CSV data filler AI assistant with access to real-time web search capabilities. You will be given a CSV file and some information about the data. You will need to fill in the missing data in the CSV file. When finding information, you should:
+
+1. Always search the web for up-to-date information when relevant
+2. If you're unsure about something, search the web to verify
+3. IMPORTANT: After finding relevant URLs from search results, ALWAYS use the scrapePages tool to get the full content of those pages. Never rely solely on search snippets.
+
+Your workflow should be:
+For each row, you should:
+1. Use searchWeb to find 10 relevant URLs from diverse sources (news sites, blogs, official documentation, etc.)
+2. Select 4-6 of the most relevant and diverse URLs to scrape
+3. Use scrapePages to get the full content of those URLs.
+
+      `,
+      stopWhen: (output) => {
+        return output.steps.length > 10;
+      },
+      messages: [
+        {
+          role: 'user',
+          content: `Enrich the data in the CSV file based on the prompt: ${enrichmentPrompt}`,
+        },
+        {
+          role: 'user',
+          content: `The rows of the CSV file are: ${JSON.stringify(rows)}`,
+        },
+      ],
+    });
+    console.log('generated object', experimental_output);
+
     const result: CsvEnrichmentJobResult = {
       success: true,
-      originalCsvUrl: csvUrl || 'direct-content',
-      enrichedDataPreview: preview + '... [PARSED] ',
-      rowsProcessed: rows.length,
       userId,
       processedAt: new Date().toISOString(),
     };

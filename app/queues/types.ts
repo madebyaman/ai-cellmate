@@ -56,9 +56,6 @@ export interface BatchEmailJobResult {
 
 export interface CsvEnrichmentJobResult {
   success: boolean;
-  originalCsvUrl: string;
-  enrichedDataPreview: string;
-  rowsProcessed: number;
   userId?: string;
   processedAt: string;
 }
