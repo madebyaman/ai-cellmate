@@ -1,65 +1,285 @@
-import { AuthenticityTokenInput } from 'remix-utils/csrf/react';
-import logoDark from './logo-dark.svg';
-import logoLight from './logo-light.svg';
-import { HoneypotInputs } from 'remix-utils/honeypot/react';
-import { Button } from '~/components/ui/button';
-import { Form } from 'react-router';
+import { AuthenticityTokenInput } from "remix-utils/csrf/react";
+import logoDark from "./logo-dark.svg";
+import logoLight from "./logo-light.svg";
+import { HoneypotInputs } from "remix-utils/honeypot/react";
+import { Button } from "~/components/ui/button";
+import { Form } from "react-router";
 
 export function Welcome() {
   return (
-    <main className="flex items-center justify-center pt-16 pb-4">
-      <Form method="POST" className="flex flex-col gap-4">
-        <input type="hidden" name="action" value="logout" />
-        <AuthenticityTokenInput />
-        <HoneypotInputs />
-        <Button type="submit">Logout</Button>
-      </Form>
-      <div className="flex-1 flex flex-col items-center gap-16 min-h-0">
-        <header className="flex flex-col items-center gap-9">
-          <div className="w-[500px] max-w-[100vw] p-4">
-            <img
-              src={logoLight}
-              alt="React Router"
-              className="block w-full dark:hidden"
-            />
-            <img
-              src={logoDark}
-              alt="React Router"
-              className="hidden w-full dark:block"
-            />
+    <div className="min-h-screen bg-white">
+      {/* Navigation */}
+      <nav className="border-b border-gray-100">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center">
+              <div className="text-xl font-bold text-gray-900">AICellmate</div>
+            </div>
+            <div className="hidden md:flex items-center space-x-8">
+              <a href="#" className="text-gray-600 hover:text-gray-900">Product</a>
+              <a href="#" className="text-gray-600 hover:text-gray-900">Pricing</a>
+              <a href="#" className="text-gray-600 hover:text-gray-900">Resources</a>
+              <a href="#" className="text-gray-600 hover:text-gray-900">Company</a>
+            </div>
+            <div className="flex items-center space-x-4">
+              <button className="text-gray-600 hover:text-gray-900">Sign in</button>
+              <button className="bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-600">
+                Start for free
+              </button>
+            </div>
           </div>
-        </header>
-        <div className="max-w-[300px] w-full space-y-6 px-4">
-          <nav className="rounded-3xl border border-slate-200 p-6 dark:border-slate-700 space-y-4">
-            <p className="leading-6 text-slate-700 dark:text-slate-200 text-center">
-              What&apos;s next?
-            </p>
-            <ul>
-              {resources.map(({ href, text, icon }) => (
-                <li key={href}>
-                  <a
-                    className="group flex items-center gap-3 self-stretch p-3 leading-normal text-blue-700 hover:underline dark:text-blue-500"
-                    href={href}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {icon}
-                    {text}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          </nav>
         </div>
-      </div>
-    </main>
+      </nav>
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Hero Section */}
+        <section className="py-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h1 className="text-5xl md:text-6xl font-bold text-gray-900 leading-tight mb-6">
+              Upload a CSV, get all the data you need
+            </h1>
+            <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
+              AICellmate turns your partial CSVs into complete, accurate
+              datasets—automatically.
+            </p>
+            <button className="bg-orange-500 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-orange-600 mb-4">
+              Start for free
+            </button>
+            <p className="text-gray-500 text-sm">No credit card required.</p>
+          </div>
+        </section>
+
+        {/* Features Section */}
+        <section className="py-20">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+              Smarter spreadsheets start here
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              AICellmate scans your CSV, detects what's missing, and fills it using
+              AI, verified sources, and live search
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8 mb-20">
+            <div className="bg-blue-50 p-8 rounded-2xl">
+              <div className="w-12 h-12 bg-blue-500 rounded-lg mb-6"></div>
+              <h3 className="text-xl font-semibold mb-4">Discover</h3>
+              <p className="text-gray-600">
+                Identify missing pieces of data like company info, emails,
+                phone numbers, LinkedIn profiles, or product details
+              </p>
+            </div>
+
+            <div className="bg-green-50 p-8 rounded-2xl">
+              <div className="w-12 h-12 bg-green-500 rounded-lg mb-6"></div>
+              <h3 className="text-xl font-semibold mb-4">Enrich</h3>
+              <p className="text-gray-600">
+                Pull fresh, verified data from trusted sources.
+              </p>
+            </div>
+
+            <div className="bg-purple-50 p-8 rounded-2xl">
+              <div className="w-12 h-12 bg-purple-500 rounded-lg mb-6"></div>
+              <h3 className="text-xl font-semibold mb-4">Validate</h3>
+              <p className="text-gray-600">
+                Ensure all filled values are correct before you use them.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        {/* Automation Section */}
+        <section className="py-20 bg-gray-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto">
+            <div className="grid lg:grid-cols-2 gap-16 items-center">
+              <div>
+                <span className="text-orange-500 font-semibold text-sm uppercase tracking-wide">
+                  02. Automation
+                </span>
+                <h2 className="text-4xl font-bold text-gray-900 mt-4 mb-6">
+                  Data enrichment that just works.
+                </h2>
+                <p className="text-xl text-gray-600 mb-8">
+                  With AICellmate, you can upload your file, select what data you want,
+                  and let AI handle the rest.
+                </p>
+
+                <div className="space-y-6">
+                  <div className="flex items-start">
+                    <div className="w-6 h-6 bg-orange-500 rounded-full mt-1 mr-4 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Smart filling</h4>
+                      <p className="text-gray-600">
+                        Automatically match the right info to the right row.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <div className="w-6 h-6 bg-orange-500 rounded-full mt-1 mr-4 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Bulk processing</h4>
+                      <p className="text-gray-600">
+                        Handle hundreds or thousands of rows at once
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start">
+                    <div className="w-6 h-6 bg-orange-500 rounded-full mt-1 mr-4 flex-shrink-0"></div>
+                    <div>
+                      <h4 className="font-semibold text-gray-900 mb-2">Real-time sources</h4>
+                      <p className="text-gray-600">
+                        Always pull the freshest available data.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-white p-8 rounded-2xl shadow-lg">
+                <div className="h-64 bg-gradient-to-br from-orange-400 to-pink-400 rounded-lg"></div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Integrations Section */}
+        <section className="py-20">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
+            <div className="bg-gray-50 p-8 rounded-2xl">
+              <div className="h-64 bg-gradient-to-br from-blue-400 to-purple-400 rounded-lg"></div>
+            </div>
+
+            <div>
+              <span className="text-orange-500 font-semibold text-sm uppercase tracking-wide">
+                03. Integrations
+              </span>
+              <h2 className="text-4xl font-bold text-gray-900 mt-4 mb-6">
+                Works where you do.
+              </h2>
+              <p className="text-xl text-gray-600 mb-8">
+                AICellmate integrates with Google Sheets, CRMs, data warehouses, and APIs.
+              </p>
+
+              <div className="space-y-4">
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-4"></div>
+                  <p className="text-gray-700">Export to Excel, Sheets, or JSON.</p>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-4"></div>
+                  <p className="text-gray-700">Connect with Zapier or direct APIs.</p>
+                </div>
+                <div className="flex items-center">
+                  <div className="w-2 h-2 bg-orange-500 rounded-full mr-4"></div>
+                  <p className="text-gray-700">Keep your data always synced.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Privacy Section */}
+        <section className="py-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+              Privacy & Accuracy First
+            </h2>
+            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
+              AICellmate prioritizes both compliance and correctness. Your data stays secure, 
+              and every filled entry comes with a confidence score so you can trust your results.
+            </p>
+          </div>
+        </section>
+
+        {/* Social Proof Section */}
+        <section className="py-20 bg-gray-50 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto text-center">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+              Market-leading AI data filler
+            </h2>
+            <p className="text-xl text-gray-600 mb-12">
+              Join the teams saving hours of work every week.
+            </p>
+            
+            <div className="flex justify-center space-x-12">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 mb-2">4.8 ★★★★★</div>
+                <p className="text-gray-600">on G2</p>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-gray-900 mb-2">4.9 ★★★★★</div>
+                <p className="text-gray-600">on Capterra</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* CTA Section */}
+        <section className="py-20 text-center">
+          <div className="max-w-4xl mx-auto">
+            <h2 className="text-4xl font-bold text-gray-900 mb-6">
+              Bring AICellmate to your workflow.
+            </h2>
+            <p className="text-xl text-gray-600 mb-12">
+              Fill any CSV—fast, accurate, and automated.
+            </p>
+            
+            <button className="bg-orange-500 text-white px-8 py-4 rounded-lg text-lg font-semibold hover:bg-orange-600 mb-4">
+              Start for free
+            </button>
+            <p className="text-gray-500 text-sm">No credit card required.</p>
+          </div>
+        </section>
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid md:grid-cols-4 gap-8">
+            <div>
+              <div className="text-xl font-bold mb-4">AICellmate</div>
+              <p className="text-gray-400">
+                The fastest way to enrich your CSV data with AI.
+              </p>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Product</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">Features</a></li>
+                <li><a href="#" className="hover:text-white">Pricing</a></li>
+                <li><a href="#" className="hover:text-white">API</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Company</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">About</a></li>
+                <li><a href="#" className="hover:text-white">Blog</a></li>
+                <li><a href="#" className="hover:text-white">Careers</a></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4">Support</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="#" className="hover:text-white">Help Center</a></li>
+                <li><a href="#" className="hover:text-white">Contact</a></li>
+                <li><a href="#" className="hover:text-white">Privacy</a></li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </footer>
+    </div>
   );
 }
 
 const resources = [
   {
-    href: 'https://reactrouter.com/docs',
-    text: 'React Router Docs',
+    href: "https://reactrouter.com/docs",
+    text: "React Router Docs",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -78,8 +298,8 @@ const resources = [
     ),
   },
   {
-    href: 'https://rmx.as/discord',
-    text: 'Join Discord',
+    href: "https://rmx.as/discord",
+    text: "Join Discord",
     icon: (
       <svg
         xmlns="http://www.w3.org/2000/svg"
