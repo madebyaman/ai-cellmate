@@ -6,12 +6,23 @@ import type {
   CsvEnrichmentJobResult,
 } from '../types';
 import { readFile } from 'fs/promises';
-import { generateObject, generateText, Output, stepCountIs, tool } from 'ai';
-import { z } from 'zod';
-import { google } from '@ai-sdk/google';
-import { searchSerper } from '~/lib/serper';
-import { bulkCrawlWebsites } from '~/utils/scraper';
-import { openai } from '@ai-sdk/openai';
+import { Langfuse } from 'langfuse';
+import { enrichRow } from '~/utils/enrich-row';
+import { NodeSDK } from '@opentelemetry/sdk-node';
+import { LangfuseExporter } from 'langfuse-vercel';
+import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
+
+const langfuse = new Langfuse({
+  environment: process.env.NODE_ENV ?? 'development',
+  secretKey: process.env.LANGFUSE_SECRET_KEY ?? '',
+  publicKey: process.env.LANGFUSE_PUBLIC_KEY ?? '',
+  baseUrl: process.env.LANGFUSE_BASE_URL ?? 'https://cloud.langfuse.com',
+});
+
+const sdk = new NodeSDK({
+  traceExporter: new LangfuseExporter(),
+  instrumentations: [getNodeAutoInstrumentations()],
+});
 
 export function createCsvEnrichmentWorker(): Worker<
   CsvEnrichmentJobDataUnion,
@@ -37,15 +48,13 @@ export function createCsvEnrichmentWorker(): Worker<
 async function processCsvEnrichment(
   data: CsvEnrichmentJobData
 ): Promise<CsvEnrichmentJobResult> {
+  sdk.start();
   const {
     csvUrl,
     csvContent,
     enrichmentPrompt = 'Enhance the data in this CSV',
     userId,
   } = data;
-
-  console.log(`Starting CSV enrichment`);
-  console.log(`Enrichment prompt: ${enrichmentPrompt}`);
 
   try {
     // Step 1: Get the CSV data
@@ -76,101 +85,51 @@ async function processCsvEnrichment(
     // Step 2: Parse CSV into row objects { header: value }
     const { headers, rows } = parseCsvToRowObjects(csvData);
 
-    // Build a dynamic schema that mirrors the CSV row structure
-    const rowShape: Record<string, z.ZodString> = Object.fromEntries(
-      headers.map((headerName) => [headerName, z.string()])
-    ) as Record<string, z.ZodString>;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i];
 
-    const result = await generateText({
-      model: openai('gpt-4o'),
-      stopWhen: stepCountIs(3),
-      experimental_output: Output.object({
-        schema: z.object({
-          rows: z.array(z.object(rowShape)),
-        }),
-      }),
-      onStepFinish: ({ toolCalls }) => {
-        for (const toolCall of toolCalls) {
-          if (toolCall.toolName === 'searchWeb') {
-            console.log('searchWeb', toolCall.input);
-          } else if (toolCall.toolName === 'scrapePages') {
-            console.log('scrapePages', toolCall.input);
-          }
-        }
-      },
-      tools: {
-        searchWeb: tool({
-          description: 'Search the web for information',
-          inputSchema: z.object({
-            query: z.string().describe('The query to search the web for'),
-          }),
-          execute: async ({ query }, { abortSignal }) => {
-            const results = await searchSerper(
-              { q: query, num: 10 },
-              abortSignal
-            );
-
-            return results.organic.map((result) => ({
-              title: result.title,
-              link: result.link,
-              snippet: result.snippet,
-              date: result.date,
-            }));
-          },
-        }),
-        scrapePages: tool({
-          description: 'Scrape the content of a list of URLs',
-          inputSchema: z.object({
-            urls: z.array(z.string()).describe('The URLs to scrape'),
-          }),
-          execute: async ({ urls }, { abortSignal }) => {
-            const results = await bulkCrawlWebsites({ urls });
-
-            if (!results.success) {
-              return {
-                error: results.error,
-                results: results.results.map(({ url, result }) => ({
-                  url,
-                  success: result.success,
-                  data: result.success ? result.data : result.error,
-                })),
-              };
-            }
-
-            return {
-              results: results.results.map(({ url, result }) => ({
-                url,
-                success: result.success,
-                data: result.data,
-              })),
-            };
-          },
-        }),
-      },
-      system: `
-    You are a CSV data filler AI assistant with access to real-time web search capabilities. You will be given a CSV file and some information about the data. You will need to fill in the missing data in the CSV file with the help of the searchWeb and scrapePages tools. When finding information, you should:
-
-1. Always search the web for up-to-date information using the searchWeb tool and the scrapePages tool to get the full content of the URLs.
-2. If you're unsure about something, search the web to verify
-
-For each row, you should:
-1. Use searchWeb to find 10 relevant URLs from diverse sources (news sites, blogs, official documentation, etc.)
-2. Select 4-6 of the most relevant and diverse URLs to scrape using the scrapePages tool.
-3. Use the full content of the URLs to fill in the missing data in the CSV file.
-
-      `,
-      messages: [
-        {
-          role: 'user',
-          content: `The rows of the CSV file are: ${JSON.stringify(rows)}`,
+      const rowTrace = langfuse.trace({
+        sessionId: userId,
+        name: `enrich-row-${i + 1}`,
+        input: { row, headers },
+        metadata: {
+          rowIndex: i + 1,
+          totalRows: rows.length,
+          // parentTraceId: trace.id,
         },
-        {
-          role: 'user',
-          content: `Fill in the missing data for the csv file:`,
-        },
-      ],
-    });
-    console.log('generated object', result.experimental_output);
+      });
+
+      try {
+        const enrichedRow = await enrichRow({
+          headers,
+          row,
+          telemetry: {
+            isEnabled: true,
+            functionId: 'enrich-row',
+            metadata: {
+              langfuseTraceId: rowTrace.id,
+            },
+          },
+        });
+
+        rowTrace.update({
+          output: { enrichedRow },
+        });
+      } catch (error) {
+        rowTrace.span({
+          level: 'ERROR',
+          statusMessage:
+            error instanceof Error ? error.message : 'Unknown error',
+          metadata: {
+            langfuseTraceId: rowTrace.id,
+          },
+        });
+        throw error;
+      }
+    }
+
+    await langfuse.flushAsync();
+    await sdk.shutdown();
 
     console.log(`CSV enrichment completed for user: ${userId}`);
     return {
