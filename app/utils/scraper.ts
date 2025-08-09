@@ -1,13 +1,42 @@
 import * as cheerio from 'cheerio';
-import { setTimeout } from 'node:timers/promises';
-import robotsParser from 'robots-parser';
 import TurndownService from 'turndown';
-// import { cacheWithRedis } from '~/server/redis/redis';
-import { fetchHtmlWithScrapingBee } from './scrapingbee';
 
-export const DEFAULT_MAX_RETRIES = 3;
-const MIN_DELAY_MS = 500; // 0.5 seconds
-const MAX_DELAY_MS = 8000; // 8 seconds
+const SCRAPINGBEE_API_KEY = process.env.SCRAPINGBEE_API_KEY;
+const SCRAPINGBEE_CONCURRENCY = parseInt(
+  process.env.SCRAPINGBEE_CONCURRENCY || '3',
+  10
+);
+
+class Semaphore {
+  private permits: number;
+  private waiting: (() => void)[] = [];
+
+  constructor(permits: number) {
+    this.permits = permits;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.permits > 0) {
+      this.permits--;
+      return;
+    }
+
+    return new Promise<void>((resolve) => {
+      this.waiting.push(resolve);
+    });
+  }
+
+  release(): void {
+    this.permits++;
+    if (this.waiting.length > 0) {
+      const resolve = this.waiting.shift()!;
+      this.permits--;
+      resolve();
+    }
+  }
+}
+
+const scrapingBeeSemaphore = new Semaphore(SCRAPINGBEE_CONCURRENCY);
 
 export interface CrawlSuccessResponse {
   success: true;
@@ -29,6 +58,16 @@ export interface BulkCrawlSuccessResponse {
   }[];
 }
 
+export interface BulkCrawlPartialResponse {
+  success: 'partial';
+  results: {
+    url: string;
+    result: CrawlResponse;
+  }[];
+  successCount: number;
+  failureCount: number;
+}
+
 export interface BulkCrawlFailureResponse {
   success: false;
   results: {
@@ -40,15 +79,13 @@ export interface BulkCrawlFailureResponse {
 
 export type BulkCrawlResponse =
   | BulkCrawlSuccessResponse
+  | BulkCrawlPartialResponse
   | BulkCrawlFailureResponse;
 
-export interface CrawlOptions {
-  maxRetries?: number;
-}
+export interface CrawlOptions {}
 
 export interface BulkCrawlOptions extends CrawlOptions {
   urls: string[];
-  concurrency?: number; // max number of parallel crawls
 }
 
 const turndownService = new TurndownService({
@@ -87,121 +124,89 @@ const extractArticleText = (html: string): string => {
   return content.trim();
 };
 
-const checkRobotsTxt = async (url: string): Promise<boolean> => {
-  try {
-    const parsedUrl = new URL(url);
-    const robotsUrl = `${parsedUrl.protocol}//${parsedUrl.host}/robots.txt`;
-    const response = await fetch(robotsUrl);
-
-    if (!response.ok) {
-      // If no robots.txt exists, assume crawling is allowed
-      return true;
-    }
-
-    const robotsTxt = await response.text();
-    const robots = robotsParser(robotsUrl, robotsTxt);
-
-    // Use a common crawler user agent
-    return robots.isAllowed(url, 'LinkedInBot') ?? true;
-  } catch (error) {
-    // If there's an error checking robots.txt, assume crawling is allowed
-    return true;
-  }
-};
-
 export const bulkCrawlWebsites = async (
   options: BulkCrawlOptions
 ): Promise<BulkCrawlResponse> => {
-  const { urls, maxRetries = DEFAULT_MAX_RETRIES, concurrency = 5 } = options;
+  const { urls } = options;
 
-  console.log('[scraper] bulk crawl start', {
-    count: urls.length,
-    maxRetries,
-    concurrency,
-  });
+  const results = await Promise.all(
+    urls.map(async (url) => ({
+      url,
+      result: await crawlWebsite({ url }),
+    }))
+  );
 
-  // Concurrency control
-  const { mapWithConcurrency } = await import('./concurrency');
-  const results = await mapWithConcurrency(urls, concurrency, async (url) => ({
-    url,
-    result: await crawlWebsite({ url, maxRetries }),
-  }));
+  const successfulResults = results.filter((r) => r.result.success);
+  const failedResults = results.filter((r) => !r.result.success);
+  
+  const successCount = successfulResults.length;
+  const failureCount = failedResults.length;
+  const totalCount = results.length;
 
-  const allSuccessful = results.every((r) => r.result.success);
-
-  if (!allSuccessful) {
-    const errors = results
-      .filter((r) => !r.result.success)
+  // All successful
+  if (successCount === totalCount) {
+    return {
+      results,
+      success: true,
+    } as BulkCrawlSuccessResponse;
+  }
+  
+  // All failed
+  if (failureCount === totalCount) {
+    const errors = failedResults
       .map((r) => `${r.url}: ${(r.result as CrawlErrorResponse).error}`)
       .join('\n');
 
     return {
       results,
       success: false,
-      error: `Failed to crawl some websites:\n${errors}`,
+      error: `All websites failed to crawl:\n${errors}`,
     };
   }
-
+  
+  // Partial success
   return {
     results,
-    success: true,
-  } as BulkCrawlResponse;
+    success: 'partial',
+    successCount,
+    failureCount,
+  } as BulkCrawlPartialResponse;
 };
 
 export const crawlWebsite = async (
   options: CrawlOptions & { url: string }
 ): Promise<CrawlResponse> => {
-  const { url, maxRetries = DEFAULT_MAX_RETRIES } = options;
+  const { url } = options;
 
-  // Check robots.txt before attempting to crawl
-  const isAllowed = await checkRobotsTxt(url);
-  if (!isAllowed) {
+  await scrapingBeeSemaphore.acquire();
+
+  try {
+    const scrapingBeeUrl = new URL('https://app.scrapingbee.com/api/v1');
+    scrapingBeeUrl.searchParams.append('api_key', SCRAPINGBEE_API_KEY || '');
+    scrapingBeeUrl.searchParams.append('url', url);
+
+    const response = await fetch(scrapingBeeUrl.toString());
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `Failed to fetch website: ${response.status} ${response.statusText}`,
+      };
+    }
+
+    const html = await response.text();
+    const articleText = extractArticleText(html);
+    return {
+      success: true,
+      data: articleText,
+    };
+  } catch (error) {
     return {
       success: false,
-      error: `Crawling not allowed by robots.txt for: ${url}`,
+      error: `Network error: ${error instanceof Error ? error.message : 'Unknown error'}`,
     };
+  } finally {
+    scrapingBeeSemaphore.release();
   }
-
-  let attempts = 0;
-
-  while (attempts < maxRetries) {
-    try {
-      console.log('[scraper] attempt', { url, attempts: attempts + 1 });
-      const html = await fetchHtmlWithScrapingBee(url);
-      const articleText = extractArticleText(html);
-      console.log('[scraper] success', { url, length: articleText.length });
-      return {
-        success: true,
-        data: articleText,
-      };
-    } catch (error) {
-      attempts++;
-      if (attempts === maxRetries) {
-        console.error('[scraper] network error maxed', {
-          url,
-          error: error instanceof Error ? error.message : 'Unknown error',
-        });
-        return {
-          success: false,
-          error: `Network error after ${maxRetries} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        };
-      }
-      const delay = Math.min(
-        MIN_DELAY_MS * Math.pow(2, attempts),
-        MAX_DELAY_MS
-      );
-      console.warn('[scraper] network error, backing off', {
-        url,
-        attempt: attempts,
-        delayMs: delay,
-        error: error instanceof Error ? error.message : 'Unknown error',
-      });
-      await setTimeout(delay);
-    }
-  }
-
-  return {
-    success: false,
-    error: 'Maximum retry attempts reached',
-  };
 };
+
