@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^2.0.3",
+    "@ai-sdk/openai": "^2.0.6",
     "@conform-to/react": "^1.8.2",
     "@conform-to/zod": "^1.8.2",
     "@epic-web/remember": "^1.1.0",
@@ -32,6 +33,7 @@
     "dotenv": "^17.2.1",
     "ioredis": "^5.7.0",
     "isbot": "^5.1.27",
+    "langfuse": "^3.38.4",
     "lucide-react": "^0.536.0",
     "prisma": "^6.13.0",
     "radix-ui": "^1.4.2",
