@@ -76,7 +76,6 @@ const fetchFromSerper = async (
   }
 
   const json = await response.json();
-  console.log('json of serper', json);
 
   return json;
 };

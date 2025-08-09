@@ -21,5 +21,5 @@ export async function requireAnonymous(request: Request) {
 
 export async function getUserId(request: Request) {
   const session = await auth.api.getSession(request);
-  return session?.user?.id;
+  return session?.user?.id ?? null;
 }

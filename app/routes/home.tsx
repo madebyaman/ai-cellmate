@@ -4,8 +4,12 @@ import { getUserId, requireUser } from '~/utils/auth.server';
 import { auth } from '~/lib/auth.server';
 import { redirectWithToast } from '~/utils/toast.server';
 import { ROUTES } from '~/utils/constants';
-import { useFetcher } from 'react-router';
+import { useFetcher, useLoaderData } from 'react-router';
 import { addCsvEnrichmentJob } from '~/queues/queues';
+// import { google } from '@ai-sdk/google';
+import { generateText, Output, stepCountIs, tool } from 'ai';
+import { z } from 'zod';
+import { openai } from '@ai-sdk/openai';
 
 export function meta({}: Route.MetaArgs) {
   return [
@@ -27,12 +31,14 @@ export async function action({ request }: Route.ActionArgs) {
     const csv = formData.get('csv');
     if (csv instanceof File) {
       const csvContent = await csv.text();
-      console.log('Adding enrichment job with content', { contentLength: csvContent.length });
+      console.log('Adding enrichment job with content', {
+        contentLength: csvContent.length,
+      });
       await addCsvEnrichmentJob({
         csvContent,
         enrichmentPrompt:
           'Enrich the CSV with the following information: name, email, phone, address',
-        userId: await getUserId(request),
+        userId: (await getUserId(request)) ?? 'unknown',
       });
     }
   } else if (action === 'logout') {
@@ -47,7 +53,7 @@ export async function action({ request }: Route.ActionArgs) {
   }
 }
 
-export default function Home({ loaderData }: Route.ComponentProps) {
+export default function Home() {
   return (
     <div>
       <Welcome />
