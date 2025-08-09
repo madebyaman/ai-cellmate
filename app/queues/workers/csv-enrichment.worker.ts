@@ -6,11 +6,12 @@ import type {
   CsvEnrichmentJobResult,
 } from '../types';
 import { readFile } from 'fs/promises';
-import { generateObject, generateText, Output, tool } from 'ai';
+import { generateObject, generateText, Output, stepCountIs, tool } from 'ai';
 import { z } from 'zod';
 import { google } from '@ai-sdk/google';
 import { searchSerper } from '~/lib/serper';
 import { bulkCrawlWebsites } from '~/utils/scraper';
+import { openai } from '@ai-sdk/openai';
 
 export function createCsvEnrichmentWorker(): Worker<
   CsvEnrichmentJobDataUnion,
@@ -80,14 +81,23 @@ async function processCsvEnrichment(
       headers.map((headerName) => [headerName, z.string()])
     ) as Record<string, z.ZodString>;
 
-    const { experimental_output } = await generateText({
-      model: google('gemini-2.0-flash'),
+    const result = await generateText({
+      model: openai('gpt-4o'),
+      stopWhen: stepCountIs(3),
       experimental_output: Output.object({
         schema: z.object({
-          headers: z.array(z.string()),
           rows: z.array(z.object(rowShape)),
         }),
       }),
+      onStepFinish: ({ toolCalls }) => {
+        for (const toolCall of toolCalls) {
+          if (toolCall.toolName === 'searchWeb') {
+            console.log('searchWeb', toolCall.input);
+          } else if (toolCall.toolName === 'scrapePages') {
+            console.log('scrapePages', toolCall.input);
+          }
+        }
+      },
       tools: {
         searchWeb: tool({
           description: 'Search the web for information',
@@ -138,43 +148,36 @@ async function processCsvEnrichment(
         }),
       },
       system: `
-    You are a CSV data filler AI assistant with access to real-time web search capabilities. You will be given a CSV file and some information about the data. You will need to fill in the missing data in the CSV file. When finding information, you should:
+    You are a CSV data filler AI assistant with access to real-time web search capabilities. You will be given a CSV file and some information about the data. You will need to fill in the missing data in the CSV file with the help of the searchWeb and scrapePages tools. When finding information, you should:
 
-1. Always search the web for up-to-date information when relevant
+1. Always search the web for up-to-date information using the searchWeb tool and the scrapePages tool to get the full content of the URLs.
 2. If you're unsure about something, search the web to verify
-3. IMPORTANT: After finding relevant URLs from search results, ALWAYS use the scrapePages tool to get the full content of those pages. Never rely solely on search snippets.
 
-Your workflow should be:
 For each row, you should:
 1. Use searchWeb to find 10 relevant URLs from diverse sources (news sites, blogs, official documentation, etc.)
-2. Select 4-6 of the most relevant and diverse URLs to scrape
-3. Use scrapePages to get the full content of those URLs.
+2. Select 4-6 of the most relevant and diverse URLs to scrape using the scrapePages tool.
+3. Use the full content of the URLs to fill in the missing data in the CSV file.
 
       `,
-      stopWhen: (output) => {
-        return output.steps.length > 10;
-      },
       messages: [
-        {
-          role: 'user',
-          content: `Enrich the data in the CSV file based on the prompt: ${enrichmentPrompt}`,
-        },
         {
           role: 'user',
           content: `The rows of the CSV file are: ${JSON.stringify(rows)}`,
         },
+        {
+          role: 'user',
+          content: `Fill in the missing data for the csv file:`,
+        },
       ],
     });
-    console.log('generated object', experimental_output);
+    console.log('generated object', result.experimental_output);
 
-    const result: CsvEnrichmentJobResult = {
+    console.log(`CSV enrichment completed for user: ${userId}`);
+    return {
       success: true,
       userId,
       processedAt: new Date().toISOString(),
     };
-
-    console.log(`CSV enrichment completed for user: ${userId}`);
-    return result;
   } catch (error) {
     console.error('CSV enrichment failed:', error);
     throw new Error(
