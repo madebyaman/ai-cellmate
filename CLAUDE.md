@@ -104,3 +104,14 @@ Required environment variables (see `.env.template`):
 - All web scraping converts HTML to markdown for better AI processing
 - Scraped content is automatically summarized using Google Gemini AI based on user queries
 - Scraped pages include extracted links for additional context and navigation
+
+## TypeScript Coding Standards
+
+- **NEVER use TypeScript `as` keyword for type assertions** (e.g., `input as any`, `data as SomeType`)
+- Use proper TypeScript patterns instead:
+  - Type guards and narrowing functions
+  - Zod schemas for runtime validation and type inference
+  - Proper generic types and constraints
+  - Union types and discriminated unions
+  - Optional chaining and nullish coalescing
+- This prevents runtime type errors and maintains type safety throughout the application
