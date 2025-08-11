@@ -4,11 +4,11 @@ import {
   stepCountIs,
   Output,
   tool,
-} from 'ai';
-import { openai } from '@ai-sdk/openai';
-import { z } from 'zod';
-import { searchSerper } from '~/lib/serper';
-import { bulkCrawlWebsites } from '~/utils/scraper';
+} from "ai";
+import { openai } from "@ai-sdk/openai";
+import { z } from "zod";
+import { searchSerper } from "~/lib/serper";
+import { bulkCrawlWebsites } from "~/utils/scraper";
 
 export const enrichRow = async (opts: {
   headers: string[];
@@ -16,18 +16,18 @@ export const enrichRow = async (opts: {
   telemetry: TelemetrySettings;
 }) => {
   const rowShape: Record<string, z.ZodString> = Object.fromEntries(
-    opts.headers.map((headerName) => [headerName, z.string()])
+    opts.headers.map((headerName) => [headerName, z.string()]),
   ) as Record<string, z.ZodString>;
 
   const result = await generateText({
-    model: openai('gpt-4o'),
-    stopWhen: stepCountIs(3),
+    model: openai("gpt-4o"),
+    stopWhen: stepCountIs(10),
     onStepFinish: ({ toolCalls }) => {
       for (const toolCall of toolCalls) {
-        if (toolCall.toolName === 'searchWeb') {
-          console.log('searchWeb tool call', toolCall.input);
-        } else if (toolCall.toolName === 'scrapePages') {
-          console.log('scrapePages tool call', toolCall.input);
+        if (toolCall.toolName === "searchWeb") {
+          console.log("searchWeb tool call", toolCall.input);
+        } else if (toolCall.toolName === "scrapePages") {
+          console.log("scrapePages tool call", toolCall.input);
         }
       }
     },
@@ -39,14 +39,14 @@ export const enrichRow = async (opts: {
     }),
     tools: {
       searchWeb: tool({
-        description: 'Search the web for information',
+        description: "Search the web for information",
         inputSchema: z.object({
-          query: z.string().describe('The query to search the web for'),
+          query: z.string().describe("The query to search the web for"),
         }),
         execute: async ({ query }, { abortSignal }) => {
           const results = await searchSerper(
             { q: query, num: 10 },
-            abortSignal
+            abortSignal,
           );
 
           return results.organic.map((result) => ({
@@ -58,30 +58,21 @@ export const enrichRow = async (opts: {
         },
       }),
       scrapePages: tool({
-        description: 'Scrape the content of a list of URLs',
+        description:
+          "Scrape and summarize content from a list of URLs. It ouputs relevant information and further links you can scrape",
         inputSchema: z.object({
-          urls: z.array(z.string()).describe('The URLs to scrape'),
+          urls: z
+            .array(z.string())
+            .describe("The URLs to scrape and summarize"),
+          query: z
+            .string()
+            .describe(
+              "The search query or context to help summarize the scraped content",
+            ),
         }),
-        execute: async ({ urls }, { abortSignal }) => {
-          const results = await bulkCrawlWebsites({ urls });
-          if (!results.success) {
-            // try again for failed urls
-            const failedUrls = results.results
-              .filter((r) => !r.result.success)
-              .map((r) => r.url);
-            if (failedUrls.length > 0) {
-              const failedResult = await bulkCrawlWebsites({
-                urls: failedUrls,
-              });
-              // combine the results
-              const combinedResults = [
-                ...results.results,
-                ...failedResult.results,
-              ];
-              return combinedResults.map((r) => r.result);
-            }
-          }
-          return results.results.map((r) => r.result);
+        execute: async ({ urls, query }, { abortSignal }) => {
+          const results = await bulkCrawlWebsites({ urls }, query);
+          return results;
         },
       }),
     },

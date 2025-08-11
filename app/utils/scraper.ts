@@ -56,6 +56,7 @@ export type CrawlResponse = CrawlSuccessResponse | CrawlErrorResponse;
 export interface BulkCrawlSuccessResponse {
   success: true;
   results: {
+    success: true;
     url: string;
     result: string;
     links?: string[];
@@ -65,6 +66,7 @@ export interface BulkCrawlSuccessResponse {
 export interface BulkCrawlPartialResponse {
   success: "partial";
   results: {
+    success: boolean;
     url: string;
     result: string;
     links?: string[];
@@ -95,15 +97,17 @@ const turndownService = new TurndownService({
   emDelimiter: "*",
 });
 
-const extractArticleText = (html: string): { content: string; links: string[] } => {
+const extractArticleText = (
+  html: string,
+): { content: string; links: string[] } => {
   const $ = cheerio.load(html);
   $("script, style, iframe, noscript").remove();
 
   // Extract all links before converting to markdown
   const links: string[] = [];
-  $('a[href]').each((_, element) => {
-    const href = $(element).attr('href');
-    if (href && href.startsWith('http')) {
+  $("a[href]").each((_, element) => {
+    const href = $(element).attr("href");
+    if (href && href.startsWith("http")) {
       links.push(href);
     }
   });
@@ -112,7 +116,7 @@ const extractArticleText = (html: string): { content: string; links: string[] } 
 
   return {
     content: content.trim(),
-    links: [...new Set(links)] // Remove duplicates
+    links: [...new Set(links)], // Remove duplicates
   };
 };
 
@@ -175,9 +179,16 @@ export const bulkCrawlWebsites = async (
   if (successCount === totalCount) {
     return {
       results: results.map((res) => ({
+        success: true as const,
         url: res.url,
-        result: res.result.success && 'summary' in res.result ? res.result.summary || "" : "",
-        links: res.result.success && 'links' in res.result ? res.result.links || [] : [],
+        result:
+          res.result.success && "summary" in res.result
+            ? res.result.summary || ""
+            : "",
+        links:
+          res.result.success && "links" in res.result
+            ? res.result.links || []
+            : [],
       })),
       success: true,
     };
@@ -186,7 +197,10 @@ export const bulkCrawlWebsites = async (
   // All failed
   if (failureCount === totalCount) {
     const errors = failedResults
-      .map((r) => `${r.url}: ${!r.result.success ? r.result.error : 'Unknown error'}`)
+      .map(
+        (r) =>
+          `${r.url}: ${!r.result.success ? r.result.error : "Unknown error"}`,
+      )
       .join("\n");
 
     return {
@@ -198,9 +212,18 @@ export const bulkCrawlWebsites = async (
   // Partial success
   return {
     results: results.map((res) => ({
+      success: res.result.success,
       url: res.url,
-      result: res.result.success && 'summary' in res.result ? res.result.summary || "" : (!res.result.success ? res.result.error : ""),
-      links: res.result.success && 'links' in res.result ? res.result.links || [] : [],
+      result:
+        res.result.success && "summary" in res.result
+          ? res.result.summary || ""
+          : !res.result.success
+            ? res.result.error
+            : "",
+      links:
+        res.result.success && "links" in res.result
+          ? res.result.links || []
+          : [],
     })),
     success: "partial",
     successCount,
