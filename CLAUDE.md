@@ -70,7 +70,7 @@ The CSV enrichment uses AI SDK with structured output and multi-step processing:
 
 - **Tools Available**:
   - `searchWeb`: Serper API integration for web search
-  - `scrapePages`: ScrapingBee bulk scraping with markdown conversion
+  - `scrapePages`: ScrapingBee bulk scraping with markdown conversion and AI-powered summarization
 - **Processing Flow**: 
   1. Parse CSV into structured row objects
   2. Generate dynamic Zod schema based on CSV headers  
@@ -102,3 +102,5 @@ Required environment variables (see `.env.template`):
 - ScrapingBee integration includes retry logic and concurrency control
 - AI agents use structured output with Zod schemas for type safety
 - All web scraping converts HTML to markdown for better AI processing
+- Scraped content is automatically summarized using Google Gemini AI based on user queries
+- Scraped pages include extracted links for additional context and navigation
