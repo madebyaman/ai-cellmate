@@ -1,26 +1,14 @@
-import type { Route } from "./+types/home";
-import { Welcome } from "../welcome/welcome";
-import { getUserId, requireUser } from "~/utils/auth.server";
-import { auth } from "~/lib/auth.server";
-import { redirectWithToast } from "~/utils/toast.server";
-import { ROUTES } from "~/utils/constants";
-import { useFetcher, useLoaderData } from "react-router";
+import { useFetcher } from "react-router";
 import { addCsvEnrichmentJob } from "~/queues/queues";
-// import { google } from '@ai-sdk/google';
-import { generateText, Output, stepCountIs, tool } from "ai";
-import { z } from "zod";
-import { openai } from "@ai-sdk/openai";
+import { getUserId, requireUser } from "~/utils/auth.server";
+import { Welcome } from "../welcome/welcome";
+import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
     { title: "New React Router App" },
     { name: "description", content: "Welcome to React Router!" },
   ];
-}
-
-export async function loader({ request }: Route.LoaderArgs) {
-  await requireUser(request);
-  return null;
 }
 
 export async function action({ request }: Route.ActionArgs) {
@@ -43,12 +31,7 @@ export async function action({ request }: Route.ActionArgs) {
 }
 
 export default function Home() {
-  return (
-    <div>
-      <Welcome />
-      <UploadCSV />
-    </div>
-  );
+  return <Welcome />;
 }
 
 function UploadCSV() {

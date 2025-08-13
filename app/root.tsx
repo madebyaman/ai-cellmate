@@ -7,6 +7,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
+  useNavigate,
   type LoaderFunctionArgs,
 } from "react-router";
 import { csrf } from "./utils/csrf.server";
@@ -114,6 +115,13 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   } else if (import.meta.env.DEV && error && error instanceof Error) {
     details = error.message;
     stack = error.stack;
+  }
+  if (
+    message.trim() ===
+    `TypeError: Cannot read properties of null (reading 'useContext')`
+  ) {
+    console.error("useContext error, full reload");
+    window.location.reload();
   }
 
   return (
