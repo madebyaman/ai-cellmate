@@ -2,6 +2,18 @@
 @import "tw-animate-css";
 
 @theme {
+  --color-primary-50: #eef6ff;
+  --color-primary-100: #d8eaff;
+  --color-primary-200: #badaff;
+  --color-primary-300: #8ac5ff;
+  --color-primary-400: #54a4ff;
+  --color-primary-500: #2c7eff;
+  --color-primary-600: #155dfb;
+  --color-primary-700: #0e47e7;
+  --color-primary-800: #123abb;
+  --color-primary-900: #153693;
+  --color-primary-950: #122259;
+
   --font-sans:
     "Inter", ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji",
     "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";

@@ -30,7 +30,6 @@
     "bullmq": "^5.56.9",
     "chalk": "^5.5.0",
     "cheerio": "^1.1.2",
-    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv-cli": "^10.0.0",
     "ioredis": "^5.7.0",
