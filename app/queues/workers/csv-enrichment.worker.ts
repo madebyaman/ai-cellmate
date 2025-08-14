@@ -8,8 +8,14 @@ import type {
 import { readFile } from "fs/promises";
 import { Langfuse } from "langfuse";
 import { fillRow } from "~/utils/fill-row";
-import { combineResults, calculateResultMetrics } from "~/utils/result-combiner";
-import { evaluateResultsSubjectively, needsOptimization } from "~/utils/subjective-evaluator";
+import {
+  combineResults,
+  calculateResultMetrics,
+} from "~/utils/result-combiner";
+import {
+  evaluateResultsSubjectively,
+  needsOptimization,
+} from "~/utils/subjective-evaluator";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { LangfuseExporter } from "langfuse-vercel";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
@@ -105,18 +111,19 @@ async function processCsvEnrichment(
       try {
         // Step 1: Fill row data
         console.log(`Processing row ${i + 1}/${rows.length}`);
-        let searchQueryRecommendation: string | undefined;
+        let searchQueryRecommendations: string[] = [];
         let attempt = 0;
         const maxAttempts = 2; // Original attempt + 1 optimization attempt
+        let currentRow = { ...row }; // Track the current state of the row
 
         while (attempt < maxAttempts) {
           attempt++;
           console.log(`Attempt ${attempt} for row ${i + 1}`);
 
-          const enrichedData = await fillRow({
+          const { result: enrichedData, searchQueries } = await fillRow({
             headers,
-            row,
-            searchQueryRecommendation,
+            row: currentRow, // Pass the updated row with previously found data
+            searchQueryRecommendations, // Pass full array instead of single string
             telemetry: {
               isEnabled: true,
               functionId: "fill-row",
@@ -134,52 +141,69 @@ async function processCsvEnrichment(
 
           // Step 2: Combine results with domain authority scoring
           const combinedResults = combineResults(enrichedData);
-          
+
           // Step 3: Calculate programmatic metrics
-          const metrics = calculateResultMetrics(combinedResults);
+          // const metrics = calculateResultMetrics(combinedResults);
 
           // Step 4: Subjective evaluation using LLM
           const evaluation = await evaluateResultsSubjectively(
             combinedResults,
-            metrics,
-            row
+            // metrics,
+            row,
+            searchQueries,
           );
 
           // Step 5: Check if optimization is needed
-          const optimization = needsOptimization(evaluation);
+          const optimization = needsOptimization(evaluation, combinedResults);
 
           if (!optimization.needsOptimization || attempt === maxAttempts) {
-            // Convert combined results back to row format
-            const finalRow = { ...row };
-            Object.entries(combinedResults).forEach(([column, data]) => {
-              finalRow[column] = data.result;
-            });
-            
+            // Use the best results from optimization
+            const finalRow = { ...currentRow, ...optimization.bestResults };
+            // Update currentRow for potential next iteration
+            currentRow = finalRow;
+
             enrichedRows.push(finalRow);
-            
+
             rowTrace.update({
-              output: { 
+              output: {
                 finalRow,
                 evaluation,
-                metrics,
                 attemptCount: attempt,
+                optimization,
               },
             });
 
-            console.log(`Row ${i + 1} completed with confidence scores:`, 
-              Object.entries(evaluation).map(([col, eval]) => `${col}: ${eval.confidence.score}`).join(', ')
+            console.log(
+              `Row ${i + 1} completed with confidence scores:`,
+              Object.entries(evaluation)
+                .map(([col, resultGroups]) => {
+                  const bestScore = Math.max(
+                    ...resultGroups.map((group) => group.confidence),
+                  );
+                  return `${col}: ${bestScore}`;
+                })
+                .join(", "),
             );
             break;
           } else {
             // Optimization needed - use search query recommendations
-            console.log(`Row ${i + 1} needs optimization. Low confidence columns:`, optimization.lowConfidenceColumns);
-            
-            // Use the first available recommendation for the next attempt
-            const firstRecommendation = Object.values(optimization.recommendations)[0];
-            searchQueryRecommendation = firstRecommendation;
-            
+            console.log(
+              `Row ${i + 1} needs optimization. Low confidence columns:`,
+              optimization.lowConfidenceColumns,
+            );
+
+            // Use all available recommendations for the next attempt
+            searchQueryRecommendations = Object.values(
+              optimization.recommendations,
+            ).flat();
+
+            // Update current row with the best results found so far
+            currentRow = { ...currentRow, ...optimization.bestResults };
+
             if (attempt < maxAttempts) {
-              console.log(`Retrying with search query: ${searchQueryRecommendation}`);
+              console.log(
+                `Retrying with search queries: ${searchQueryRecommendations.join(", ")}`,
+              );
             }
           }
         }
@@ -193,7 +217,7 @@ async function processCsvEnrichment(
             langfuseTraceId: rowTrace.id,
           },
         });
-        
+
         // Add the original row on error
         enrichedRows.push(row);
       }
@@ -202,13 +226,14 @@ async function processCsvEnrichment(
     // await langfuse.flushAsync();
     await sdk.shutdown();
 
-    console.log(`CSV enrichment completed for user: ${userId}. Processed ${enrichedRows.length} rows.`);
+    console.log(
+      `CSV enrichment completed for user: ${userId}. Processed ${enrichedRows.length} rows.`,
+    );
     return {
       success: true,
       userId,
       processedAt: new Date().toISOString(),
-      rowsProcessed: enrichedRows.length,
-      totalRows: rows.length,
+      // totalRows: rows.length,
     };
   } catch (error) {
     console.error("CSV enrichment failed:", error);

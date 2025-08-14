@@ -14,28 +14,35 @@ export const fillRow = async (opts: {
   headers: string[];
   row: Record<string, string>;
   telemetry: TelemetrySettings;
-  searchQueryRecommendation?: string;
+  searchQueryRecommendations?: string[];
 }) => {
+  const searchQueries: string[] = [];
   const result = await generateText({
     model: openai("gpt-4o"),
     stopWhen: stepCountIs(10),
     onStepFinish: ({ toolCalls }) => {
       for (const toolCall of toolCalls) {
         if (toolCall.toolName === "searchWeb") {
-          console.log("searchWeb tool call", toolCall.input);
-        } else if (toolCall.toolName === "scrapePages") {
-          console.log("scrapePages tool call", toolCall.input);
+          if (
+            typeof toolCall.input === "object" &&
+            toolCall.input &&
+            "query" in toolCall.input &&
+            typeof toolCall.input.query === "string"
+          )
+            searchQueries.push(toolCall.input.query);
         }
       }
     },
     experimental_telemetry: opts.telemetry,
     experimental_output: Output.object({
       schema: z.object({
-        enrichedData: z.array(z.object({
-          sourceWebsite: z.string().describe("The source website URL"),
-          column: z.string().describe("The column name being enriched"),
-          result: z.string().describe("The enriched value for this column"),
-        })),
+        enrichedData: z.array(
+          z.object({
+            sourceWebsite: z.string().describe("The source website URL"),
+            column: z.string().describe("The column name being enriched"),
+            result: z.string().describe("The enriched value for this column"),
+          }),
+        ),
       }),
     }),
     tools: {
@@ -84,13 +91,13 @@ export const fillRow = async (opts: {
 2. Select 4-6 most relevant URLs to scrape using scrapePages tool
 3. For each column being filled, specify the source website URL where you found the information
 
-${opts.searchQueryRecommendation ? `Use this search query recommendation: ${opts.searchQueryRecommendation}` : ''}
+${opts.searchQueryRecommendations && opts.searchQueryRecommendations.length > 0 ? `Use these search query recommendations: ${opts.searchQueryRecommendations.join(", ")}` : ""}
 
 Return enrichedData array with entries for each column you fill, including the sourceWebsite URL and the filled result.
       `,
     prompt: `
     Fill in the missing data for this row: ${JSON.stringify(opts.row)}
-    
+
     For each column you fill, return:
     - sourceWebsite: The URL where you found the information
     - column: The column name
@@ -98,5 +105,9 @@ Return enrichedData array with entries for each column you fill, including the s
     `,
   });
 
-  return result.experimental_output?.enrichedData;
+  return {
+    result: result.experimental_output?.enrichedData;
+    searchQueries
+  }
+
 };
