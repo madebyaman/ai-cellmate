@@ -1,25 +1,78 @@
-import { CircleUser } from "lucide-react";
-import { NavLink } from "react-router";
+import {
+  Link,
+  useLoaderData,
+  useLocation,
+  type ClientLoaderFunctionArgs,
+} from "react-router";
 import LayoutWrapper from "~/components/layout-wrapper";
-import { cn } from "~/utils/misc";
+import BillingSection from "~/components/billing-section";
+import Heading from "~/components/ui/heading";
 
 const secondaryNavigation = [
-  { name: "Personal Information", href: "#" },
-  { name: "Billing & Plan", href: "#" },
+  { name: "Profile & Preferences", href: "#personal-information" },
+  { name: "Billing & Plan", href: "#billing" },
   { name: "Preferences", href: "#" },
   { name: "Team members", href: "#" },
   { name: "Danger Zone", href: "#" },
 ];
 
+const sampleBillingData = [
+  {
+    id: "starter-active",
+    planName: "starter",
+    renewalDate: "12/25/2024",
+    creditsLeft: 850,
+    isCancelled: false,
+  },
+  {
+    id: "pro-active",
+    planName: "pro",
+    renewalDate: "01/15/2025",
+    creditsLeft: 2450,
+    isCancelled: false,
+  },
+  {
+    id: "starter-cancelled",
+    planName: "starter",
+    cancelDate: "12/31/2024",
+    creditsLeft: 125,
+    isCancelled: true,
+  },
+  {
+    id: "pro-cancelled",
+    planName: "pro",
+    cancelDate: "01/08/2025",
+    creditsLeft: 3200,
+    isCancelled: true,
+  },
+  {
+    id: "starter-low-credits",
+    planName: "starter",
+    renewalDate: "12/20/2024",
+    creditsLeft: 25,
+    isCancelled: false,
+  },
+];
+
+export async function clientLoader({ request }: ClientLoaderFunctionArgs) {
+  const selectedState = sampleBillingData[0];
+
+  return {
+    billingData: selectedState,
+  };
+}
+
 export default function Settings() {
+  const { billingData } = useLoaderData<typeof clientLoader>();
+  const location = useLocation();
+
   return (
     <LayoutWrapper>
-      <div className="flex gap-2">
+      <div className="flex gap-4">
         <h1 className="sr-only">General Settings</h1>
-
         <aside className="flex overflow-x-auto border-b border-gray-900/5 lg:block lg:w-64 lg:flex-none lg:border-0">
           <nav className="flex-none px-4 sm:px-6 lg:px-0">
-            <h2 className="text-base/4 font-semibold text-gray-500 mb-4 pl-2">
+            <h2 className="text-sm font-semibold text-gray-500 mb-6 pl-2 mt-4">
               Settings
             </h2>
             <ul
@@ -28,19 +81,18 @@ export default function Settings() {
             >
               {secondaryNavigation.map((item) => (
                 <li key={item.name}>
-                  <NavLink
+                  <Link
+                    // data-active={item.href === location.hash}
                     to={item.href}
-                    className={({ isActive, isPending }) =>
-                      [
-                        isPending || isActive
-                          ? "bg-gray-50 text-indigo-600"
-                          : "text-gray-700 hover:bg-gray-50 hover:text-indigo-600",
-                        "group flex gap-x-3 rounded-md py-2 pr-3 pl-2 text-sm/6 font-semibold",
-                      ].join(" ")
-                    }
+                    className={[
+                      item.href === location.hash
+                        ? "bg-gray-200 text-gray-800"
+                        : "text-gray-700 hover:bg-gray-200",
+                      "group flex gap-x-3 rounded-md py-2 pr-3 pl-2 text-sm/6 font-semibold",
+                    ].join(" ")}
                   >
                     {item.name}
-                  </NavLink>
+                  </Link>
                 </li>
               ))}
             </ul>
@@ -49,14 +101,21 @@ export default function Settings() {
         <div className="flex-1 flex flex-col gap-8">
           <form className="bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl md:col-span-2">
             <div className="px-4 py-6 sm:p-8">
-              <h2 className="text-base/7 font-semibold text-gray-900 mb-4">
-                Personal Information
-              </h2>
-              <div className="grid max-w-2xl grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
+              <Heading
+                id="personal-information"
+                className="text-base md:text-base font-semibold text-gray-900 mb-2"
+                as="h2"
+              >
+                Profile & Preferences
+              </Heading>
+              <p className="text-sm text-gray-600 mb-6">
+                Update your personal information and notification preferences
+              </p>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-6">
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="first-name"
-                    className="block text-sm/6 font-medium text-gray-900"
+                    className="block text-sm font-medium text-gray-900"
                   >
                     First name
                   </label>
@@ -66,7 +125,7 @@ export default function Settings() {
                       name="first-name"
                       type="text"
                       autoComplete="given-name"
-                      className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                      className="block w-full rounded-md bg-white px-3 py-1.5 text-sm text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600"
                     />
                   </div>
                 </div>
@@ -74,7 +133,7 @@ export default function Settings() {
                 <div className="sm:col-span-3">
                   <label
                     htmlFor="last-name"
-                    className="block text-sm/6 font-medium text-gray-900"
+                    className="block text-sm font-medium text-gray-900"
                   >
                     Last name
                   </label>
@@ -84,7 +143,7 @@ export default function Settings() {
                       name="last-name"
                       type="text"
                       autoComplete="family-name"
-                      className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
+                      className="block w-full rounded-md bg-white px-3 py-1.5 text-sm text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600"
                     />
                   </div>
                 </div>
@@ -92,29 +151,168 @@ export default function Settings() {
                 <div className="col-span-full">
                   <label
                     htmlFor="about"
-                    className="block text-sm/6 font-medium text-gray-900"
+                    className="block text-sm font-medium text-gray-900 mb-4"
                   >
-                    About
+                    Email preferences
                   </label>
-                  <div className="mt-2">
-                    <textarea
-                      id="about"
-                      name="about"
-                      rows={3}
-                      className="block w-full rounded-md bg-white px-3 py-1.5 text-base text-gray-900 outline-1 -outline-offset-1 outline-gray-300 placeholder:text-gray-400 focus:outline-2 focus:-outline-offset-2 focus:outline-indigo-600 sm:text-sm/6"
-                      defaultValue={""}
-                    />
+                  <div className="mt-0">
+                    <fieldset>
+                      <div className="space-y-6">
+                        <div className="flex gap-3">
+                          <div className="flex h-6 shrink-0 items-center">
+                            <div className="group grid size-4 grid-cols-1">
+                              <input
+                                defaultChecked
+                                id="success-job"
+                                name="success-job"
+                                type="checkbox"
+                                aria-describedby="success-job-description"
+                                className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                              />
+                              <svg
+                                fill="none"
+                                viewBox="0 0 14 14"
+                                className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25"
+                              >
+                                <path
+                                  d="M3 8L6 11L11 3.5"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-checked:opacity-100"
+                                />
+                                <path
+                                  d="M3 7H11"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-indeterminate:opacity-100"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="text-sm">
+                            <label
+                              htmlFor="success-job"
+                              className="font-medium text-gray-900"
+                            >
+                              Job Completed
+                            </label>
+                            <p
+                              id="success-job-description"
+                              className="text-gray-500"
+                            >
+                              Get notified when a CSV job is completed
+                              successfully.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="flex h-6 shrink-0 items-center">
+                            <div className="group grid size-4 grid-cols-1">
+                              <input
+                                id="failed-job"
+                                name="failed-job"
+                                type="checkbox"
+                                aria-describedby="failed-job-description"
+                                className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                              />
+                              <svg
+                                fill="none"
+                                viewBox="0 0 14 14"
+                                className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25"
+                              >
+                                <path
+                                  d="M3 8L6 11L11 3.5"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-checked:opacity-100"
+                                />
+                                <path
+                                  d="M3 7H11"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-indeterminate:opacity-100"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="text-sm">
+                            <label
+                              htmlFor="failed-job"
+                              className="font-medium text-gray-900"
+                            >
+                              Failed Job
+                            </label>
+                            <p
+                              id="failed-job-description"
+                              className="text-gray-500"
+                            >
+                              Get notified when a data processing job fails, so
+                              you can fix it quickly.
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-3">
+                          <div className="flex h-6 shrink-0 items-center">
+                            <div className="group grid size-4 grid-cols-1">
+                              <input
+                                id="updates"
+                                name="updates"
+                                type="checkbox"
+                                aria-describedby="updates-description"
+                                className="col-start-1 row-start-1 appearance-none rounded-sm border border-gray-300 bg-white checked:border-indigo-600 checked:bg-indigo-600 indeterminate:border-indigo-600 indeterminate:bg-indigo-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600 disabled:border-gray-300 disabled:bg-gray-100 disabled:checked:bg-gray-100 forced-colors:appearance-auto"
+                              />
+                              <svg
+                                fill="none"
+                                viewBox="0 0 14 14"
+                                className="pointer-events-none col-start-1 row-start-1 size-3.5 self-center justify-self-center stroke-white group-has-disabled:stroke-gray-950/25"
+                              >
+                                <path
+                                  d="M3 8L6 11L11 3.5"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-checked:opacity-100"
+                                />
+                                <path
+                                  d="M3 7H11"
+                                  strokeWidth={2}
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                  className="opacity-0 group-has-indeterminate:opacity-100"
+                                />
+                              </svg>
+                            </div>
+                          </div>
+                          <div className="text-sm">
+                            <label
+                              htmlFor="updates"
+                              className="font-medium text-gray-900"
+                            >
+                              Updates
+                            </label>
+                            <p
+                              id="updates-description"
+                              className="text-gray-500"
+                            >
+                              Stay in the loop when we release new features or
+                              improvements.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </fieldset>
                   </div>
-                  <p className="mt-3 text-sm/6 text-gray-600">
-                    Write a few sentences about yourself.
-                  </p>
                 </div>
               </div>
             </div>
             <div className="flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">
               <button
                 type="button"
-                className="text-sm/6 font-semibold text-gray-900"
+                className="text-sm font-semibold text-gray-900"
               >
                 Cancel
               </button>
@@ -126,6 +324,12 @@ export default function Settings() {
               </button>
             </div>
           </form>
+          <BillingSection
+            billingData={billingData}
+            onUpgrade={() => {}}
+            onDowngrade={() => {}}
+            onBuyCredits={() => {}}
+          />
         </div>
       </div>
     </LayoutWrapper>
