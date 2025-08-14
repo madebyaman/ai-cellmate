@@ -1,15 +1,16 @@
-import { magicLinkClient } from 'better-auth/client/plugins';
-import { createAuthClient } from 'better-auth/react';
+import { magicLinkClient } from "better-auth/client/plugins";
+import { createAuthClient } from "better-auth/react";
+import { polarClient } from "@polar-sh/better-auth";
 
 export const authClient = createAuthClient({
-  baseURL: 'http://localhost:5173',
-  plugins: [magicLinkClient()],
+  baseURL: "http://localhost:5173",
+  plugins: [magicLinkClient(), polarClient()],
   fetchOptions: {
     onError: async (context) => {
-      console.log('error in fetchoptions >>>>>', context);
+      console.log("error in fetchoptions >>>>>", context);
       const { response } = context;
       if (response.status === 429) {
-        const retryAfter = response.headers.get('X-Retry-After');
+        const retryAfter = response.headers.get("X-Retry-After");
         console.log(`Rate limit exceeded. Retry after ${retryAfter} seconds`);
       }
     },
