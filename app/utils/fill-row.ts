@@ -10,15 +10,12 @@ import { z } from "zod";
 import { searchSerper } from "~/lib/serper";
 import { bulkCrawlWebsites } from "~/utils/scraper";
 
-export const enrichRow = async (opts: {
+export const fillRow = async (opts: {
   headers: string[];
   row: Record<string, string>;
   telemetry: TelemetrySettings;
+  searchQueryRecommendation?: string;
 }) => {
-  const rowShape: Record<string, z.ZodString> = Object.fromEntries(
-    opts.headers.map((headerName) => [headerName, z.string()]),
-  ) as Record<string, z.ZodString>;
-
   const result = await generateText({
     model: openai("gpt-4o"),
     stopWhen: stepCountIs(10),
@@ -34,7 +31,11 @@ export const enrichRow = async (opts: {
     experimental_telemetry: opts.telemetry,
     experimental_output: Output.object({
       schema: z.object({
-        row: z.object(rowShape),
+        enrichedData: z.array(z.object({
+          sourceWebsite: z.string().describe("The source website URL"),
+          column: z.string().describe("The column name being enriched"),
+          result: z.string().describe("The enriched value for this column"),
+        })),
       }),
     }),
     tools: {
@@ -77,21 +78,25 @@ export const enrichRow = async (opts: {
       }),
     },
     system: `
-    You are a json data filler AI assistant with access to real-time web search capabilities. You will be given a json object and some information about the data. You will need to fill in the missing data in the json object with the help of the searchWeb and scrapePages tools. When finding information, you should:
+    You are a data filling AI assistant with web search capabilities. For each column that needs data, return the source website and the filled value. When finding information:
 
-1. Always search the web for up-to-date information using the searchWeb tool and the scrapePages tool to get the full content of the URLs.
-2. If you're unsure about something, search the web to verify
+1. Use searchWeb to find 10 relevant URLs from diverse sources
+2. Select 4-6 most relevant URLs to scrape using scrapePages tool
+3. For each column being filled, specify the source website URL where you found the information
 
-For the row: ${JSON.stringify(opts.row)}
-1. Use searchWeb to find 10 relevant URLs from diverse sources (news sites, blogs, official documentation, etc.)
-2. Select 4-6 of the most relevant and diverse URLs to scrape using the scrapePages tool.
-3. Use the full content of the URLs to fill in the missing data in the row.
+${opts.searchQueryRecommendation ? `Use this search query recommendation: ${opts.searchQueryRecommendation}` : ''}
 
+Return enrichedData array with entries for each column you fill, including the sourceWebsite URL and the filled result.
       `,
     prompt: `
-    Fill in the missing data for the row: ${JSON.stringify(opts.row)}
+    Fill in the missing data for this row: ${JSON.stringify(opts.row)}
+    
+    For each column you fill, return:
+    - sourceWebsite: The URL where you found the information
+    - column: The column name
+    - result: The filled value
     `,
   });
 
-  return result.experimental_output?.row;
+  return result.experimental_output?.enrichedData;
 };
