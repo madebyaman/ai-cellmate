@@ -106,8 +106,7 @@ Return enrichedData array with entries for each column you fill, including the s
   });
 
   return {
-    result: result.experimental_output?.enrichedData;
-    searchQueries
-  }
-
+    result: result.experimental_output?.enrichedData,
+    searchQueries,
+  };
 };

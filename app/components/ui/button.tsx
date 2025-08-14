@@ -7,7 +7,7 @@ const getVariantClasses = (variant: string = "default") => {
     default:
       "bg-gradient-to-br from-primary-600 to-primary-700 text-white ring-primary-400",
     destructive: "bg-red-50 text-red-600 hover:bg-red-100 ring-red-400",
-    outline: "border border-slate-300 bg-white hover:bg-slate-50",
+    outline: "border border-slate-300 bg-white hover:bg-slate-50 ring-gray-400",
     secondary:
       "bg-gradient-to-br from-gray-800 to-gray-900 text-white ring-gray-400",
     ghost:

@@ -5,7 +5,7 @@ interface TextProps extends React.HTMLAttributes<HTMLParagraphElement> {
   className?: string;
 }
 
-export function Text({ children, className, ...rest }: TextProps) {
+export default function Text({ children, className, ...rest }: TextProps) {
   return (
     <p
       className={cn(
