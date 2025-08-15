@@ -8,7 +8,7 @@ import Input from "~/components/ui/input";
 import { ArrowRight } from "lucide-react";
 import Heading from "~/components/ui/heading";
 import type { ReactNode } from "react";
-import { Text } from "~/components/ui/text";
+import Text from "~/components/ui/text";
 
 export function Welcome() {
   return (
