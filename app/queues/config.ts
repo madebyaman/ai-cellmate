@@ -2,7 +2,7 @@ import IORedis from 'ioredis';
 
 // Redis connection configuration
 export const redisConnection = process.env.REDIS_URL 
-  ? new IORedis(process.env.REDIS_URL, {
+  ? new IORedis(process.env.REDIS_URL + "?family=0", {
       maxRetriesPerRequest: null,
     })
   : new IORedis({
