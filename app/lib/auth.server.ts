@@ -46,6 +46,42 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    organization({
+      async sendInvitationEmail(data) {
+        const inviteLink = `${process.env.BASE_URL || "http://localhost:5173"}/accept-invitation/${data.id}`;
+        await sendEmail({
+          To: data.email,
+          Subject: `You're invited to join ${data.organization.name}`,
+          TextBody: `${data.inviter.user.name} has invited you to join ${data.organization.name}. Click here to accept: ${inviteLink}`,
+          HtmlBody: `
+            <p>${data.inviter.user.name} has invited you to join <strong>${data.organization.name}</strong>.</p>
+            <p><a href="${inviteLink}">Click here to accept the invitation</a></p>
+          `,
+        });
+      },
+      organizationCreation: {
+        afterCreate: async ({ organization, user }) => {
+          // Create Stripe customer for the organization
+          // const customer = await stripeClient.customers.create({
+          //   email: user.email,
+          //   name: organization.name,
+          //   metadata: {
+          //     organizationId: organization.id,
+          //     userId: user.id,
+          //   },
+          // });
+          // // Update organization metadata with Stripe customer ID
+          // await auth.api.updateOrganization({
+          //   organizationId: organization.id,
+          //   data: {
+          //     metadata: JSON.stringify({
+          //       stripeCustomerId: customer.id,
+          //     }),
+          //   },
+          // });
+        },
+      },
+    }),
     magicLink({
       sendMagicLink: async (data, request) => {
         const { email, url } = data;
@@ -60,18 +96,63 @@ export const auth = betterAuth({
     stripe({
       stripeClient,
       stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-      createCustomerOnSignUp: true,
+      createCustomerOnSignUp: false, // We'll create customers for organizations instead
+      authorizeReference: () => {},
       subscription: {
         enabled: true,
         plans,
+        //   getCustomerId: async ({ user, request }) => {
+        //     // Get the user's active organization
+        //     const activeOrganization =
+        //       await auth.api.getActiveOrganization(request);
+
+        //     if (!activeOrganization) {
+        //       throw new Error("No active organization found");
+        //     }
+
+        //     // Parse organization metadata to get Stripe customer ID
+        //     if (activeOrganization.metadata) {
+        //       try {
+        //         const metadata = JSON.parse(activeOrganization.metadata);
+        //         if (metadata.stripeCustomerId) {
+        //           return metadata.stripeCustomerId;
+        //         }
+        //       } catch (e) {
+        //         console.error("Failed to parse organization metadata:", e);
+        //       }
+        //     }
+
+        //     // If no customer ID exists, create a new customer for the organization
+        //     const customer = await stripeClient.customers.create({
+        //       email: user.email,
+        //       name: activeOrganization.name,
+        //       metadata: {
+        //         organizationId: activeOrganization.id,
+        //         userId: user.id,
+        //       },
+        //     });
+
+        //     // Update organization metadata with Stripe customer ID
+        //     await auth.api.updateOrganization({
+        //       organizationId: activeOrganization.id,
+        //       data: {
+        //         metadata: JSON.stringify({
+        //           stripeCustomerId: customer.id,
+        //         }),
+        //       },
+        //     });
+
+        //     return customer.id;
+        //   },
+        // },
       },
       onEvent: async (event) => {
         switch (event.type) {
           case "invoice.paid":
             const invoice = event.data.object;
             console.log("invoice", JSON.stringify(invoice));
-            const userId = invoice.metadata?.userId;
-            console.log("userId", userId);
+            const organizationId = invoice.customer?.metadata?.organizationId;
+            console.log("organizationId", organizationId);
 
             // const priceId = invoice.lines?.data[0]?.
 
