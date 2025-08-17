@@ -16,7 +16,7 @@ import {
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
-import { requireUser } from "~/utils/auth.server";
+import { requireUserWithOrganization } from "~/utils/auth.server";
 import { getUserSubscription } from "~/utils/sub.server";
 import { ROUTES } from "~/utils/constants";
 import { redirectWithToast } from "~/utils/toast.server";
@@ -46,7 +46,7 @@ const userNavigation = [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  await requireUser(request);
+  await requireUserWithOrganization(request);
 
   // Don't require subscription for billing page to avoid infinite redirect
   const url = new URL(request.url);
