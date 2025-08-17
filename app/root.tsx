@@ -7,7 +7,6 @@ import {
   Scripts,
   ScrollRestoration,
   useLoaderData,
-  useNavigate,
   type LoaderFunctionArgs,
 } from "react-router";
 import { csrf } from "./utils/csrf.server";
@@ -94,7 +93,6 @@ export default function App() {
       <AuthenticityTokenProvider token={data.csrfToken}>
         <Layout env={data.ENV}>
           <Outlet />
-          <div id="root"></div>
         </Layout>
       </AuthenticityTokenProvider>
     </HoneypotProvider>

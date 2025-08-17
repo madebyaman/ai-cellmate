@@ -1,36 +1,50 @@
-import {
-  CreditCard,
-  Calendar,
-  Coins,
-  PlusIcon,
-  CoinsIcon,
-  Plus,
-} from "lucide-react";
-import { Button } from "./ui/button";
+import { Calendar, Plus } from "lucide-react";
+import { useLoaderData, type LoaderFunctionArgs } from "react-router";
+import { auth } from "~/lib/auth.server";
+import { prisma } from "~/lib/prisma.server";
+import { Button } from "../components/ui/button";
+import { getUserSubscription } from "~/utils/sub.server";
+import { BillingPlans } from "~/components/billing-plans";
 
-interface BillingData {
-  planName: string;
-  renewalDate?: string;
-  cancelDate?: string;
-  creditsLeft: number;
-  isCancelled: boolean;
+export async function loader({ request }: LoaderFunctionArgs) {
+  const [activeSub, session] = await Promise.all([
+    getUserSubscription(request),
+    auth.api.getSession({
+      headers: request.headers,
+    }),
+  ]);
+
+  if (!session) {
+    throw new Response("Unauthorized", { status: 401 });
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      id: true,
+      credits: true,
+    },
+  });
+
+  if (!user) {
+    throw new Response("User not found", { status: 404 });
+  }
+
+  const userCredits = user.credits;
+
+  return {
+    activeSub,
+    creditsLeft: userCredits?.amount || 0,
+  };
 }
 
-interface BillingSectionProps {
-  billingData: BillingData;
-  onUpgrade?: () => void;
-  onDowngrade?: () => void;
-  onBuyCredits?: () => void;
-}
+export default function BillingSection() {
+  const { activeSub, creditsLeft } = useLoaderData<typeof loader>();
+  console.log("data", activeSub);
+  // const { planName, creditsLeft, isCancelled, ...rest } = billingData;
+  const isCancelled = false;
 
-export default function BillingSection({
-  billingData,
-  onUpgrade,
-  onDowngrade,
-  onBuyCredits,
-}: BillingSectionProps) {
-  const { planName, renewalDate, cancelDate, creditsLeft, isCancelled } =
-    billingData;
+  if (!activeSub) return <BillingPlans />;
 
   return (
     <div className="bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl">
@@ -60,13 +74,13 @@ export default function BillingSection({
 
         <div className="flex items-center gap-2 mt-6">
           <Calendar className="h-4 w-4 text-gray-500" />
-          <p className="text-sm text-gray-600">
+          {/*<p className="text-sm text-gray-600">
             {isCancelled ? (
-              <>Cancels on {cancelDate}</>
+              <>Cancels on {rest?.cancelDate ?? ""}</>
             ) : (
-              <>Renews on {renewalDate}</>
+              <>Renews on {rest?.renewalDate ?? ""}</>
             )}
-          </p>
+          </p>*/}
         </div>
 
         <div className="flex flex-col gap-1 mt-6">
@@ -114,6 +128,7 @@ export default function BillingSection({
           Upgrade to Pro
         </button>
       </div>
+      <BillingPlans />
     </div>
   );
 }

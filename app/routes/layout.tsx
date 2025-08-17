@@ -1,5 +1,11 @@
 import { Frown, HeartIcon, Menu, SmileIcon, ThumbsUp, X } from "lucide-react";
-import { Link, NavLink, Outlet, useFetcher } from "react-router";
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useFetcher,
+  type LoaderFunctionArgs,
+} from "react-router";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { HoneypotInputs } from "remix-utils/honeypot/react";
 import {
@@ -10,6 +16,10 @@ import {
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
+import { requireUser } from "~/utils/auth.server";
+import { getUserSubscription } from "~/utils/sub.server";
+import { ROUTES } from "~/utils/constants";
+import { redirectWithToast } from "~/utils/toast.server";
 
 const user = {
   name: "Tom Cook",
@@ -34,6 +44,27 @@ const userNavigation = [
   { name: "Settings", href: "#" },
   { name: "Sign out", href: "#" },
 ];
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  await requireUser(request);
+
+  // Don't require subscription for billing page to avoid infinite redirect
+  const url = new URL(request.url);
+  const currentPath = url.pathname;
+  if (currentPath === ROUTES.BILLING) {
+    return null;
+  }
+
+  const sub = await getUserSubscription(request);
+  if (!sub) {
+    return await redirectWithToast(ROUTES.BILLING, {
+      type: "message",
+      description:
+        "You need a subscription to continue. Taking you to billing now",
+      title: "No active subscription",
+    });
+  }
+}
 
 export default function Example() {
   return (

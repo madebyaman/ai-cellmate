@@ -1,10 +1,9 @@
-import { redirect } from 'react-router';
-import { auth } from '~/lib/auth.server';
-import { ROUTES } from './constants';
+import { redirect } from "react-router";
+import { auth } from "~/lib/auth.server";
+import { ROUTES } from "./constants";
 
 export async function requireUser(request: Request) {
   const session = await auth.api.getSession(request);
-  // console.log('session', session);
   if (!session) {
     throw redirect(ROUTES.LOGIN);
   }

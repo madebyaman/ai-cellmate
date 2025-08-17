@@ -14,6 +14,9 @@ export default [
   route("logout", "routes/logout.ts"),
   layout("./routes/layout.tsx", [
     route("app", "./routes/dashboard.tsx"),
-    route("settings", "./routes/settings.tsx"),
+    route("settings", "./routes/settings.tsx", [
+      index("./routes/profile-settings.tsx"),
+      route("billing", "./routes/billing-settings.tsx"),
+    ]),
   ]),
 ] satisfies RouteConfig;

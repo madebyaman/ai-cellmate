@@ -1,25 +1,39 @@
 import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.server";
-import { magicLink } from "better-auth/plugins";
+import { magicLink, organization } from "better-auth/plugins";
+import { stripe } from "@better-auth/stripe";
 import sendEmail from "~/utils/email.server";
-import {
-  polar,
-  checkout,
-  portal,
-  usage,
-  webhooks,
-} from "@polar-sh/better-auth";
-import { Polar } from "@polar-sh/sdk";
+import Stripe from "stripe";
 
-const polarClient = new Polar({
-  accessToken: process.env.POLAR_ACCESS_TOKEN,
-  server: "sandbox", // or 'production'
+const stripeClient = new Stripe(process.env.STRIPE_TEST_KEY!, {
+  apiVersion: "2025-07-30.basil",
 });
+
+const plans = [
+  {
+    id: "starter",
+    name: "Starter",
+    priceId: process.env.STRIPE_STARTER_PRICE_ID!,
+    credits: 200,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    priceId: process.env.STRIPE_PRO_PRICE_ID!,
+    credits: 1000,
+  },
+  {
+    id: "booster",
+    name: "Booster",
+    priceId: process.env.STRIPE_BOOSTER_PRICE_ID!,
+    credits: 200,
+  },
+];
 
 export const auth = betterAuth({
   database: prismaAdapter(prisma, {
-    provider: "sqlite",
+    provider: "postgresql",
   }),
   cookiePrefix: "better-auth",
   rateLimit: {
@@ -43,28 +57,67 @@ export const auth = betterAuth({
         });
       },
     }),
-    polar({
-      client: polarClient,
+    stripe({
+      stripeClient,
+      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
       createCustomerOnSignUp: true,
-      use: [
-        checkout({
-          products: [
-            { productId: process.env.POLAR_STARTER_ID!, slug: "starter" },
-            { productId: process.env.POLAR__PRO_ID!, slug: "pro" },
-            {
-              productId: process.env.POLAR_BOOSTER_50_ID!,
-              slug: "booster-50",
-            },
-          ],
-          successUrl: "/billing/success?checkout_id={CHECKOUT_ID}",
-          authenticatedUsersOnly: true,
-        }),
-        portal(),
-        usage(),
-        // webhooks({
-        //   secret: process.env.POLAR_WEBHOOK_SECRET!,
-        // }),
-      ],
+      subscription: {
+        enabled: true,
+        plans,
+      },
+      onEvent: async (event) => {
+        switch (event.type) {
+          case "invoice.paid":
+            const invoice = event.data.object;
+            console.log("invoice", JSON.stringify(invoice));
+            const userId = invoice.metadata?.userId;
+            console.log("userId", userId);
+
+            // const priceId = invoice.lines?.data[0]?.
+
+            // if (invoice.lines?.data) {
+            //   for (const lineItem of invoice.lines.data) {
+            //     if (
+            //       lineItem.parent?.type === "subscription_item_details" &&
+            //       lineItem.parent.subscription_item_details?.subscription
+            //     ) {
+            //       subscriptionId =
+            //         lineItem.parent.subscription_item_details.subscription;
+            //       break;
+            //     }
+            //   }
+            // }
+
+            // // If no subscription found in lines, this might not be a subscription invoice
+            // if (!subscriptionId) {
+            //   console.error("No subscription found for invoice", invoice.id);
+            //   return new Response(null, { status: 200 });
+            // }
+            // if (!userId) {
+            //   console.error("No userId found for invoice", invoice.id);
+            //   return new Response(null, { status: 200 });
+            // }
+
+            // const credits
+
+            // await prisma.credits.upsert({
+            //   where: { userId },
+            //   update: {
+            //     amount: {
+            //       increment: credits,
+            //     },
+            //   },
+            //   create: {
+            //     userId,
+            //     amount: credits,
+            //   },
+            // });
+            break;
+          default:
+            console.log("No event handling for ", event.type);
+            return;
+        }
+      },
     }),
   ],
 });
