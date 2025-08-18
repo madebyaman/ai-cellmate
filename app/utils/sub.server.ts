@@ -2,40 +2,20 @@ import { redirect } from "react-router";
 import { auth } from "~/lib/auth.server";
 import { ROUTES } from "./constants";
 
-export async function getUserSubscription(request: Request) {
+export async function getUserSubscription(request: Request, orgId: string) {
   // Get the user's active organization
-  const activeOrganization = await auth.api.listActiveSubscriptions(request);
-
-  if (!activeOrganization) {
-    return null;
-  }
-
-  // Parse organization metadata to get Stripe customer ID
-  let stripeCustomerId = null;
-  if (activeOrganization.metadata) {
-    try {
-      const metadata = JSON.parse(activeOrganization.metadata);
-      stripeCustomerId = metadata.stripeCustomerId;
-    } catch (e) {
-      console.error("Failed to parse organization metadata:", e);
-    }
-  }
-
-  if (!stripeCustomerId) {
-    return null;
-  }
-
-  // Get subscriptions for the organization's Stripe customer
-  const subscriptions = await auth.api.listActiveSubscriptions({
-    headers: request.headers,
+  const subs = await auth.api.listActiveSubscriptions({
     query: {
-      customerId: stripeCustomerId,
+      referenceId: orgId,
     },
+    // This endpoint requires session cookies.
+    headers: request.headers,
   });
+  console.log("The org %s has subs", orgId, subs);
 
-  // get the active subscription
-  const activeSubscription = subscriptions.find(
-    (sub) => sub.status === "active" || sub.status === "trialing",
-  );
-  return activeSubscription;
+  if (!subs || subs.length === 0) {
+    return null;
+  }
+
+  return subs;
 }

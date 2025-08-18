@@ -21,7 +21,6 @@ model User {
   updatedAt     DateTime
   sessions      Session[]
   accounts      Account[]
-  credits       Credits?
 
   stripeCustomerId String?
 
@@ -80,12 +79,12 @@ model Verification {
 }
 
 model Credits {
-  id        String   @id @default(cuid())
-  userId    String   @unique
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  amount    Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id             String       @id @default(cuid())
+  organizationId String       @unique
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  amount         Int          @default(0)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
 
   @@map("credits")
 }
@@ -114,6 +113,7 @@ model Organization {
   metadata    String?
   members     Member[]
   invitations Invitation[]
+  credits     Credits?
 
   @@unique([slug])
   @@map("organization")

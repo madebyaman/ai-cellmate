@@ -6,22 +6,20 @@ import { stripe } from "@better-auth/stripe";
 import sendEmail from "~/utils/email.server";
 import Stripe from "stripe";
 
-const stripeClient = new Stripe(process.env.STRIPE_TEST_KEY!, {
-  apiVersion: "2025-07-30.basil",
-});
+const stripeClient = new Stripe(process.env.STRIPE_TEST_KEY!);
 
 const plans = [
   {
     id: "starter",
     name: "Starter",
-    priceId: process.env.STRIPE_STARTER_PRICE_ID!,
+    priceId: "price_1Rx3glSE1YMlG7zxDfVd4c0L",
     credits: 200,
   },
   {
     id: "pro",
     name: "Pro",
-    priceId: process.env.STRIPE_PRO_PRICE_ID!,
-    credits: 1000,
+    priceId: "price_1Rx3hxSE1YMlG7zxROgqgr32",
+    credits: 500,
   },
   {
     id: "booster",
@@ -59,28 +57,31 @@ export const auth = betterAuth({
           `,
         });
       },
-      organizationCreation: {
-        afterCreate: async ({ organization, user }) => {
-          // Create Stripe customer for the organization
-          // const customer = await stripeClient.customers.create({
-          //   email: user.email,
-          //   name: organization.name,
-          //   metadata: {
-          //     organizationId: organization.id,
-          //     userId: user.id,
-          //   },
-          // });
-          // // Update organization metadata with Stripe customer ID
-          // await auth.api.updateOrganization({
-          //   organizationId: organization.id,
-          //   data: {
-          //     metadata: JSON.stringify({
-          //       stripeCustomerId: customer.id,
-          //     }),
-          //   },
-          // });
-        },
-      },
+      // organizationCreation: {
+      //   afterCreate: async (params) => {
+
+      //     // Create Stripe customer for the organization
+      //     const customer = await stripeClient.customers.create({
+      //       email: user.email,
+      //       name: organization.name,
+      //       metadata: {
+      //         organizationId: organization.id,
+      //         userId: user.id,
+      //       },
+      //     });
+      //     // Update organization metadata with Stripe customer ID
+      //     await auth.api.updateOrganization({
+      //       body: {
+      //         data: {
+      //           metadata: {
+      //             stripeCustomerId: customer.id,
+      //           },
+      //         },
+      //         organizationId: organization.id,
+      //       },
+      //     });
+      //   },
+      // },
     }),
     magicLink({
       sendMagicLink: async (data, request) => {
@@ -96,10 +97,30 @@ export const auth = betterAuth({
     stripe({
       stripeClient,
       stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET!,
-      createCustomerOnSignUp: false, // We'll create customers for organizations instead
-      authorizeReference: () => {},
+      createCustomerOnSignUp: true, // We'll create customers for organizations instead
       subscription: {
         enabled: true,
+        getCheckoutSessionParams: async (params, request) => {
+          const sub = params.subscription;
+          console.log("sub ???????", sub);
+          return {
+            params: {
+              metadata: {
+                organizationId: sub.referenceId,
+              },
+            },
+          };
+        },
+        authorizeReference: async ({ user, referenceId }) => {
+          const member = await prisma.member.findFirst({
+            where: {
+              userId: user.id,
+              organizationId: referenceId,
+            },
+          });
+
+          return member?.role === "owner" || member?.role === "admin";
+        },
         plans,
         //   getCustomerId: async ({ user, request }) => {
         //     // Get the user's active organization
@@ -148,51 +169,85 @@ export const auth = betterAuth({
       },
       onEvent: async (event) => {
         switch (event.type) {
-          case "invoice.paid":
-            const invoice = event.data.object;
-            console.log("invoice", JSON.stringify(invoice));
-            const organizationId = invoice.customer?.metadata?.organizationId;
-            console.log("organizationId", organizationId);
+          case "checkout.session.completed":
+            const session = event.data.object;
 
-            // const priceId = invoice.lines?.data[0]?.
+            try {
+              // 1. Get the organization ID from session metadata
+              const organizationId = session.metadata?.organizationId;
+              if (!organizationId) {
+                console.error(
+                  "No organizationId found in checkout session metadata",
+                );
+                break;
+              }
 
-            // if (invoice.lines?.data) {
-            //   for (const lineItem of invoice.lines.data) {
-            //     if (
-            //       lineItem.parent?.type === "subscription_item_details" &&
-            //       lineItem.parent.subscription_item_details?.subscription
-            //     ) {
-            //       subscriptionId =
-            //         lineItem.parent.subscription_item_details.subscription;
-            //       break;
-            //     }
-            //   }
-            // }
+              // 2. Get the subscription to find the plan
+              const customerId = session.customer;
+              if (!customerId || typeof customerId !== "string") {
+                console.error(
+                  "No customerId found in checkout session metadata",
+                );
+                break;
+              }
+              const subscription = await prisma.subscription.findFirst({
+                where: {
+                  stripeCustomerId: customerId,
+                  referenceId: organizationId,
+                },
+              });
 
-            // // If no subscription found in lines, this might not be a subscription invoice
-            // if (!subscriptionId) {
-            //   console.error("No subscription found for invoice", invoice.id);
-            //   return new Response(null, { status: 200 });
-            // }
-            // if (!userId) {
-            //   console.error("No userId found for invoice", invoice.id);
-            //   return new Response(null, { status: 200 });
-            // }
+              if (!subscription) {
+                console.error(
+                  "No subscription found for customer:",
+                  customerId,
+                );
+                break;
+              }
 
-            // const credits
+              // 3. Find the plan details
+              const plan = plans.find((p) => p.id === subscription.plan);
+              if (!plan) {
+                console.error("Plan not found:", subscription.plan);
+                break;
+              }
 
-            // await prisma.credits.upsert({
-            //   where: { userId },
-            //   update: {
-            //     amount: {
-            //       increment: credits,
-            //     },
-            //   },
-            //   create: {
-            //     userId,
-            //     amount: credits,
-            //   },
-            // });
+              // 4. Update or create credits for the organization
+              const existingCredits = await prisma.credits.findUnique({
+                where: { organizationId },
+              });
+
+              if (existingCredits) {
+                // For subscriptions, set credits to plan amount
+                // For one-off purchases (booster), add credits on top
+                const newAmount =
+                  subscription.plan === "booster"
+                    ? existingCredits.amount + plan.credits
+                    : plan.credits;
+
+                await prisma.credits.update({
+                  where: { organizationId },
+                  data: { amount: newAmount },
+                });
+              } else {
+                // Create new credits record for the organization
+                await prisma.credits.create({
+                  data: {
+                    organizationId,
+                    amount: plan.credits,
+                  },
+                });
+              }
+
+              console.log(
+                `Successfully credited ${plan.credits} credits to organization ${organizationId} for plan ${plan.name}`,
+              );
+            } catch (error) {
+              console.error(
+                "Error processing checkout.session.completed:",
+                error,
+              );
+            }
             break;
           default:
             console.log("No event handling for ", event.type);

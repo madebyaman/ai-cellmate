@@ -1,6 +1,7 @@
 const billingPlans = [
   {
     name: "Starter Plan",
+    planName: "starter",
     price: "$49",
     period: "/month",
     description: "For individuals starting with automation",
@@ -19,6 +20,7 @@ const billingPlans = [
   },
   {
     name: "Pro Plan",
+    planName: "pro",
     price: "$99",
     period: "/month",
     description: "Best for professionals and power users",
@@ -39,24 +41,9 @@ const billingPlans = [
 
 import { CheckIcon, ArrowUpIcon } from "lucide-react";
 import { Button } from "./ui/button";
-import { authClient } from "~/lib/auth-client";
+import { Form } from "react-router";
 
 export function BillingPlans() {
-  const handlePlanSelection = async (planName: string) => {
-    try {
-      // Get the plan ID based on plan name
-      const planId = planName === "Starter Plan" ? "starter" : "pro";
-      
-      // Create subscription for the active organization
-      await authClient.stripe.createSubscription({
-        planId,
-        returnUrl: window.location.href,
-      });
-    } catch (error) {
-      console.error("Failed to create subscription:", error);
-    }
-  };
-
   return (
     <div className="flex gap-6 max-w-4xl mx-auto">
       {billingPlans.map((plan) => (
@@ -106,14 +93,18 @@ export function BillingPlans() {
           </div>
 
           {/* Button */}
-          <Button 
-            variant="outline"
-            onClick={() => handlePlanSelection(plan.name)}
-          >
-            {!plan.isCurrentPlan && <ArrowUpIcon className="w-4 h-4" />}
-            {plan.buttonText}
-            {plan.isCurrentPlan && <CheckIcon className="w-4 h-4 ml-2" />}
-          </Button>
+          <Form method="post">
+            <Button
+              type="submit"
+              name="plan"
+              value={plan.planName}
+              variant="outline"
+            >
+              {!plan.isCurrentPlan && <ArrowUpIcon className="w-4 h-4" />}
+              {plan.buttonText}
+              {plan.isCurrentPlan && <CheckIcon className="w-4 h-4 ml-2" />}
+            </Button>
+          </Form>
         </div>
       ))}
     </div>
