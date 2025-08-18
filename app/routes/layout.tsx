@@ -3,8 +3,10 @@ import {
   Link,
   NavLink,
   Outlet,
+  redirect,
+  UNSAFE_invariant,
   useFetcher,
-  useParams,
+  useLoaderData,
   type LoaderFunctionArgs,
 } from "react-router";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
@@ -17,13 +19,14 @@ import {
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
-import {
-  requireUser,
-  requireOrganization,
-  requireSubscription,
-  getActiveOrganizationId,
-} from "~/utils/auth.server";
+import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
+import {
+  getActiveOrganizationId,
+  requireSubscription,
+  requireUser,
+} from "~/utils/auth.server";
+import { ROUTES } from "~/utils/constants";
 import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 const user = {
@@ -33,14 +36,14 @@ const user = {
     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
 };
 
-const getNavigation = (slug: string) => [
+const navigation = [
   {
     name: "Dashboard",
-    href: slug,
+    href: "/app",
   },
   {
     name: "Settings",
-    href: `${slug}/settings`,
+    href: `/settings`,
   },
 ];
 
@@ -50,45 +53,47 @@ const userNavigation = [
   { name: "Sign out", href: "#" },
 ];
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  const [user, organization, activeOrgId] = await Promise.all([
+export async function loader({ request }: LoaderFunctionArgs) {
+  const [user, activeOrgId, orgsList] = await Promise.all([
     requireUser(request),
-    requireOrganization(request),
     getActiveOrganizationId(request),
+    auth.api.listOrganizations({ headers: request.headers }),
   ]);
-  const subscription = await requireSubscription(request, activeOrgId ?? "");
+  if (orgsList.length === 0) redirect(ROUTES.CREATE_ORGANIZATION);
+  const firstOrg = orgsList[0];
 
-  const slug = params.slug as string;
-  const verifiedOrg = await verifyUserAccessToOrganization({
-    slug,
-    userId: user.id,
-  });
-
-  // Set active organization if none exists
   if (!activeOrgId) {
     await auth.api.setActiveOrganization({
       body: {
-        organizationId: verifiedOrg.id,
-        organizationSlug: verifiedOrg.slug ?? "",
+        organizationId: firstOrg.id,
+        organizationSlug: firstOrg.slug,
       },
       headers: request.headers,
     });
   }
-  console.log("sub", subscription);
+  const userId = user?.user?.id;
+  UNSAFE_invariant(userId, "no user id");
+  UNSAFE_invariant(activeOrgId, "no active org set");
+  const activeOrg = await verifyUserAccessToOrganization({
+    userId,
+    orgId: activeOrgId,
+  });
 
-  return { organization: verifiedOrg, user, subscription };
+  const subscription = await requireSubscription(request, activeOrgId ?? "");
+
+  return { activeOrg, user, subscription, orgsList };
 }
 
 export default function Example() {
-  const params = useParams();
-  const navigation = getNavigation(params.slug!);
+  const { activeOrg, orgsList } = useLoaderData<typeof loader>();
+
   return (
     <div className="min-h-full flex flex-col">
       <nav className="border-b border-gray-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
             <div className="flex">
-              <div className="flex shrink-0 items-center">
+              <div className="flex shrink-0 items-center mr-6">
                 <img
                   alt="Your Company"
                   src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
@@ -98,6 +103,12 @@ export default function Example() {
                   alt="Your Company"
                   src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
                   className="hidden h-8 w-auto lg:block"
+                />
+              </div>
+              <div className="flex items-center">
+                <WorkspaceDropdown
+                  selectedOrgId={activeOrg.id}
+                  orgs={orgsList}
                 />
               </div>
               <div className="hidden sm:-my-px sm:ml-6 sm:flex sm:space-x-8">
