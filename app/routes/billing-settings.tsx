@@ -1,25 +1,22 @@
 import { Calendar, Plus } from "lucide-react";
-import { useLoaderData, type LoaderFunctionArgs } from "react-router";
-import { auth } from "~/lib/auth.server";
-import { prisma } from "~/lib/prisma.server";
-import { Button } from "../components/ui/button";
-import { getUserSubscription } from "~/utils/sub.server";
+import {
+  UNSAFE_invariant,
+  useLoaderData,
+  type LoaderFunctionArgs,
+} from "react-router";
 import { BillingPlans } from "~/components/billing-plans";
+import { prisma } from "~/lib/prisma.server";
+import { getActiveOrganizationId } from "~/utils/auth.server";
+import { getUserSubscription } from "~/utils/sub.server";
+import { Button } from "../components/ui/button";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const [activeSub, session] = await Promise.all([
-    getUserSubscription(request),
-    auth.api.getSession({
-      headers: request.headers,
-    }),
-  ]);
+  const activeOrg = await getActiveOrganizationId(request);
+  UNSAFE_invariant(activeOrg, "No active org found");
+  const sub = await getUserSubscription(request, activeOrg);
 
-  if (!session) {
-    throw new Response("Unauthorized", { status: 401 });
-  }
-
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+  const user = await prisma.organization.findUnique({
+    where: { id: activeOrg },
     select: {
       id: true,
       credits: true,
@@ -33,18 +30,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const userCredits = user.credits;
 
   return {
-    activeSub,
     creditsLeft: userCredits?.amount || 0,
+    planName: sub[0]?.plan,
   };
 }
 
 export default function BillingSection() {
-  const { activeSub, creditsLeft } = useLoaderData<typeof loader>();
-  console.log("data", activeSub);
+  const { planName, creditsLeft } = useLoaderData<typeof loader>();
+  console.log("data", planName, creditsLeft);
   // const { planName, creditsLeft, isCancelled, ...rest } = billingData;
   const isCancelled = false;
-
-  if (!activeSub) return <BillingPlans />;
 
   return (
     <div className="bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl">
@@ -128,7 +123,6 @@ export default function BillingSection() {
           Upgrade to Pro
         </button>
       </div>
-      <BillingPlans />
     </div>
   );
 }
