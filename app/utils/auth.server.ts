@@ -21,7 +21,7 @@ export async function requireAnonymous(request: Request) {
       orgId: orgId ?? undefined,
     });
     if (!org.slug) throw new Error("Expected slug of workspace");
-    throw redirect(ROUTES.DASHBOARD(org.slug));
+    throw redirect(ROUTES.DASHBOARD);
   }
   return session;
 }

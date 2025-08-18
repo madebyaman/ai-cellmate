@@ -19,12 +19,12 @@ export default [
   route("logout", "routes/logout.ts"),
 
   // Redirect route for /app
-  route("app", "routes/middleware.tsx"),
+  // route("app", "routes/middleware.tsx"),
 
   // Protected routes with middleware checks
   layout("./routes/layout.tsx", [
-    route(":slug", "./routes/dashboard.tsx"),
-    route(":slug/settings", "./routes/settings.tsx", [
+    route("app", "./routes/dashboard.tsx"),
+    route("settings", "./routes/settings.tsx", [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),
     ]),

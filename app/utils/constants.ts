@@ -5,7 +5,11 @@ export const ROUTES = {
   CREATE_ORGANIZATION: "/create-organization",
   BILLING: "/billing",
   LOGOUT: "/logout",
-  DASHBOARD: (slug: string) => "/" + slug,
-  SETTINGS: (slug: string) => `/${slug}/settings`,
-  BILLING_SETTINGS: (slug: string) => `/${slug}/settings/billing`,
+  DASHBOARD: "/app",
+  SETTINGS: `/settings`,
+  BILLING_SETTINGS: `/settings/billing`,
 } as const;
+
+export const INTENTS = {
+  CHANGE_WORKSPACE: "change-workspace",
+};
