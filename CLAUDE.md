@@ -115,3 +115,8 @@ Required environment variables (see `.env.template`):
   - Union types and discriminated unions
   - Optional chaining and nullish coalescing
 - This prevents runtime type errors and maintains type safety throughout the application
+
+## Code Style Preferences
+
+- **Keep imports at the top of files** - Prefer importing modules and utilities at the top rather than using dynamic imports within functions when possible
+- This improves code readability and makes dependencies clear at first glance

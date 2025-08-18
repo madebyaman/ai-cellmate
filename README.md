@@ -85,3 +85,7 @@ This template comes with [Tailwind CSS](https://tailwindcss.com/) already config
 ---
 
 Built with ❤️ using React Router.
+
+```sh
+stripe listen --forward-to localhost:5173/api/auth/stripe/webhook
+```
