@@ -1,6 +1,22 @@
 import { Plus } from "lucide-react";
+import { type LoaderFunctionArgs } from "react-router";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
+import { prisma } from "~/lib/prisma.server";
+import { getActiveOrganizationId } from "~/utils/auth.server";
+// import { verifyUserAccessToOrganization } from "~/utils/organization.server";
+
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  // const slug = params.slug as string;
+  const id = await getActiveOrganizationId(request);
+  const org = await prisma.organization.findUnique({
+    where: { id },
+  });
+  console.log("org", org);
+  // const organization = await verifyUserAccessToOrganization(request, slug);
+  // return { organization };
+  return null;
+}
 
 export default function Dashboard() {
   return (

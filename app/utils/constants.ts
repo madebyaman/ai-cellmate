@@ -1,10 +1,11 @@
 export const ROUTES = {
   HOME: "/",
-  DASHBOARD: "/app",
+  APP: "/app", // This now redirects to first organization
   LOGIN: "/login",
   CREATE_ORGANIZATION: "/create-organization",
-  SETTINGS: "/settings",
   BILLING: "/billing",
-  BILLING_SETTINGS: "/settings/billing",
   LOGOUT: "/logout",
+  DASHBOARD: (slug: string) => "/" + slug,
+  SETTINGS: (slug: string) => `/${slug}/settings`,
+  BILLING_SETTINGS: (slug: string) => `/${slug}/settings/billing`,
 } as const;

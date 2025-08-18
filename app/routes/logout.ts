@@ -5,7 +5,7 @@ import { ROUTES } from "~/utils/constants";
 import { redirectWithToast } from "~/utils/toast.server";
 
 export async function action({ request }: ActionFunctionArgs) {
-  const userId = await requireUser(request);
+  await requireUser(request);
   const response = await auth.api.signOut({
     headers: request.headers,
     asResponse: true,

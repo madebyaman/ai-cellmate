@@ -4,6 +4,7 @@ import {
   NavLink,
   Outlet,
   useFetcher,
+  useParams,
   type LoaderFunctionArgs,
 } from "react-router";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
@@ -16,10 +17,14 @@ import {
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
-import { requireUserWithOrganization } from "~/utils/auth.server";
-import { getUserSubscription } from "~/utils/sub.server";
-import { ROUTES } from "~/utils/constants";
-import { redirectWithToast } from "~/utils/toast.server";
+import {
+  requireUser,
+  requireOrganization,
+  requireSubscription,
+  getActiveOrganizationId,
+} from "~/utils/auth.server";
+import { auth } from "~/lib/auth.server";
+import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 const user = {
   name: "Tom Cook",
@@ -28,14 +33,14 @@ const user = {
     "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
 };
 
-const navigation = [
+const getNavigation = (slug: string) => [
   {
     name: "Dashboard",
-    href: "app",
+    href: slug,
   },
   {
     name: "Settings",
-    href: "settings",
+    href: `${slug}/settings`,
   },
 ];
 
@@ -45,28 +50,38 @@ const userNavigation = [
   { name: "Sign out", href: "#" },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  await requireUserWithOrganization(request);
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const [user, organization, activeOrgId] = await Promise.all([
+    requireUser(request),
+    requireOrganization(request),
+    getActiveOrganizationId(request),
+  ]);
+  const subscription = await requireSubscription(request, activeOrgId ?? "");
 
-  // Don't require subscription for billing page to avoid infinite redirect
-  const url = new URL(request.url);
-  const currentPath = url.pathname;
-  if (currentPath === ROUTES.BILLING) {
-    return null;
-  }
+  const slug = params.slug as string;
+  const verifiedOrg = await verifyUserAccessToOrganization({
+    slug,
+    userId: user.id,
+  });
 
-  const sub = await getUserSubscription(request);
-  if (!sub) {
-    return await redirectWithToast(ROUTES.BILLING, {
-      type: "message",
-      description:
-        "You need a subscription to continue. Taking you to billing now",
-      title: "No active subscription",
+  // Set active organization if none exists
+  if (!activeOrgId) {
+    await auth.api.setActiveOrganization({
+      body: {
+        organizationId: verifiedOrg.id,
+        organizationSlug: verifiedOrg.slug ?? "",
+      },
+      headers: request.headers,
     });
   }
+  console.log("sub", subscription);
+
+  return { organization: verifiedOrg, user, subscription };
 }
 
 export default function Example() {
+  const params = useParams();
+  const navigation = getNavigation(params.slug!);
   return (
     <div className="min-h-full flex flex-col">
       <nav className="border-b border-gray-200 bg-white">
