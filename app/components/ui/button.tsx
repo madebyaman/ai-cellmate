@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import * as React from "react";
+import { Link } from "react-router";
 import { cn } from "~/utils/misc";
 
 const getVariantClasses = (variant: string = "default") => {
@@ -42,6 +43,7 @@ export interface ButtonProps
     | "icon";
   size?: "default" | "wide" | "full" | "sm" | "lg" | "pill" | "icon";
   isLoading?: boolean;
+  to?: string;
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -52,6 +54,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       size = "default",
       children,
       isLoading,
+      to,
       ...props
     },
     ref,
@@ -59,14 +62,29 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const baseClasses =
       "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium shadow-sm transition-all duration-200 hover:shadow outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 ring-offset-1 disabled:pointer-events-none disabled:opacity-50 cursor-pointer";
 
+    const classes = cn(
+      baseClasses,
+      getVariantClasses(variant),
+      getSizeClasses(size),
+      className,
+    );
+
+    // If 'to' prop is provided or variant is 'link', render as Link
+    if (to || variant === "link") {
+      return (
+        <Link
+          to={to || "#"}
+          className={classes}
+          {...(props as any)}
+        >
+          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+        </Link>
+      );
+    }
+
     return (
       <button
-        className={cn(
-          baseClasses,
-          getVariantClasses(variant),
-          getSizeClasses(size),
-          className,
-        )}
+        className={classes}
         disabled={isLoading || props.disabled}
         ref={ref}
         {...props}
