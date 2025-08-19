@@ -1,12 +1,12 @@
+import { parseWithZod } from "@conform-to/zod";
 import { Frown, HeartIcon, Menu, SmileIcon, ThumbsUp, X } from "lucide-react";
 import {
   Link,
   NavLink,
   Outlet,
-  redirect,
-  UNSAFE_invariant,
   useFetcher,
   useLoaderData,
+  useRouteLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from "react-router";
@@ -20,16 +20,17 @@ import {
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
+import SubscriptionAlert from "~/components/subscription-alert";
 import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
 import { prisma } from "~/lib/prisma.server";
+import { createOrganizationSchema } from "~/schema/organization";
 import {
-  getActiveOrganizationId,
-  requireSubscription,
-  requireUser,
+  requireActiveOrg,
+  getSubscription,
+  getOrganizationCredits,
 } from "~/utils/auth.server";
-import { CHANGE_WORKSPACE_FORM, CREATE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
-import { verifyUserAccessToOrganization } from "~/utils/organization.server";
+import { CHANGE_WORKSPACE_FORM, INTENTS } from "~/utils/constants";
 
 const user = {
   name: "Tom Cook",
@@ -55,34 +56,14 @@ const userNavigation = [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const [user, activeOrgId, orgsList] = await Promise.all([
-    requireUser(request),
-    getActiveOrganizationId(request),
-    auth.api.listOrganizations({ headers: request.headers }),
+  const { activeOrg, orgsList, user } = await requireActiveOrg(request);
+
+  const [subscription, credits] = await Promise.all([
+    getSubscription(request, activeOrg.id),
+    getOrganizationCredits(request, activeOrg.id),
   ]);
-  if (orgsList.length === 0) redirect(ROUTES.CREATE_ORGANIZATION);
-  const firstOrg = orgsList[0];
 
-  if (!activeOrgId) {
-    await auth.api.setActiveOrganization({
-      body: {
-        organizationId: firstOrg.id,
-        organizationSlug: firstOrg.slug,
-      },
-      headers: request.headers,
-    });
-  }
-  const userId = user?.user?.id;
-  UNSAFE_invariant(userId, "no user id");
-  UNSAFE_invariant(activeOrgId, "no active org set");
-  const activeOrg = await verifyUserAccessToOrganization({
-    userId,
-    orgId: activeOrgId,
-  });
-
-  const subscription = await requireSubscription(request, activeOrgId ?? "");
-
-  return { activeOrg, user, subscription, orgsList };
+  return { activeOrg, user, subscription, credits, orgsList };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -115,13 +96,36 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   if (intent === INTENTS.CREATE_WORKSPACE) {
-    const workspaceName = formData.get(CREATE_WORKSPACE_FORM.NAME);
-    
-    if (workspaceName) {
-      // TODO: Implement workspace/organization creation logic
-      // This would involve creating a new organization in the database
-      // and setting it as the active organization
-      console.log("Creating workspace:", workspaceName);
+    // Validate form data
+    const submission = parseWithZod(formData, {
+      schema: createOrganizationSchema.omit({ userName: true }),
+    });
+
+    if (submission.status !== "success") {
+      return { error: "Invalid form data", submission: submission.reply() };
+    }
+
+    const { name, slug } = submission.value;
+
+    try {
+      // Create organization in database
+      const data = await auth.api.createOrganization({
+        body: {
+          name,
+          slug,
+          keepCurrentActiveOrganization: false,
+        },
+        // This endpoint requires session cookies.
+        headers: request.headers,
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error creating organization:", error);
+      return {
+        error: "Error creating organization",
+        submission: submission.reply(),
+      };
     }
   }
 
@@ -129,11 +133,13 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Layout() {
-  const { activeOrg, orgsList } = useLoaderData<typeof loader>();
+  const { activeOrg, orgsList, subscription, credits } =
+    useLoaderData<typeof loader>();
+  console.log("credits", credits);
 
   return (
     <div className="min-h-full flex flex-col">
-      <nav className="border-b border-gray-200 bg-white">
+      <nav className="border-b border-gray-200 bg-white sticky top-0">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
             <div className="flex">
@@ -279,6 +285,7 @@ export default function Layout() {
           </div>
         </div>
       </nav>
+      {!subscription && <SubscriptionAlert />}
 
       <div className="py-10 bg-gray-50 flex-1">
         <Outlet />
@@ -441,4 +448,8 @@ function FeedbackButton() {
       </PopoverContent>
     </Popover>
   );
+}
+
+export function useAppLayoutLoaderData() {
+  return useRouteLoaderData<typeof loader>("routes/layout");
 }

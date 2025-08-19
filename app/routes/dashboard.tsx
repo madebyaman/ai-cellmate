@@ -1,9 +1,20 @@
 import { Plus } from "lucide-react";
-import { type LoaderFunctionArgs } from "react-router";
+import {
+  type LoaderFunctionArgs,
+  type ActionFunctionArgs,
+  data,
+  useFetcher,
+} from "react-router";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { prisma } from "~/lib/prisma.server";
-import { getActiveOrganizationId } from "~/utils/auth.server";
+import {
+  getActiveOrganizationId,
+  validateSubscriptionAndCredits,
+  type SubscriptionError,
+} from "~/utils/auth.server";
+import { redirectWithToast } from "~/utils/toast.server";
+import { ROUTES } from "~/utils/constants";
 // import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
@@ -18,15 +29,57 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   return null;
 }
 
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get("intent") as string;
+
+  if (intent === "add-new-data") {
+    const orgId = await getActiveOrganizationId(request);
+
+    // Server-side validation - check if user has subscription and at least 10 credits
+    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
+
+    if (!validation.valid) {
+      // return data({ error: validation.error }, { status: 400 });
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description:
+          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
+        title: "No subscription or credits left",
+      });
+    }
+
+    // If validation passes, proceed with the action
+    console.log("Proceeding with adding new data...");
+    return data({ success: true });
+  }
+
+  return data({ error: "Invalid intent" }, { status: 400 });
+}
+
 export default function Dashboard() {
+  const fetcher = useFetcher();
+
+  const handleAddNewData = () => {
+    const formData = new FormData();
+    formData.append("intent", "add-new-data");
+    fetcher.submit(formData, { method: "POST" });
+  };
+
   return (
     <LayoutWrapper>
       <div className="flex justify-between">
         <h1 className="text-3xl font-bold tracking-tight text-gray-900">
           My Data
         </h1>
-        <Button variant="default" className="text-sm gap-1">
-          <Plus className="size-5" /> Add New Data
+        <Button
+          variant="default"
+          className="text-sm gap-1"
+          onClick={handleAddNewData}
+          disabled={fetcher.state !== "idle"}
+        >
+          <Plus className="size-5" />
+          {fetcher.state !== "idle" ? "Processing..." : "Add New Data"}
         </Button>
       </div>
       <div className="mt-8 flow-root">
