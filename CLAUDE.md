@@ -120,3 +120,5 @@ Required environment variables (see `.env.template`):
 
 - **Keep imports at the top of files** - Prefer importing modules and utilities at the top rather than using dynamic imports within functions when possible
 - This improves code readability and makes dependencies clear at first glance
+- **Avoid hanging constants and magic strings** - All constants, form field names, route values, and reusable strings should be organized in the `app/utils/constants.ts` file using logical groupings (e.g., `CHANGE_WORKSPACE_FORM`, `CREATE_WORKSPACE_FORM`)
+- This ensures consistency, prevents typos, and makes refactoring easier
