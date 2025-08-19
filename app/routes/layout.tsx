@@ -7,6 +7,7 @@ import {
   UNSAFE_invariant,
   useFetcher,
   useLoaderData,
+  type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from "react-router";
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
@@ -21,12 +22,13 @@ import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import { Button } from "~/components/ui/button";
 import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
+import { prisma } from "~/lib/prisma.server";
 import {
   getActiveOrganizationId,
   requireSubscription,
   requireUser,
 } from "~/utils/auth.server";
-import { ROUTES } from "~/utils/constants";
+import { CHANGE_WORKSPACE_FORM, CREATE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
 import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 const user = {
@@ -49,7 +51,6 @@ const navigation = [
 
 const userNavigation = [
   { name: "Your Profile", href: "#" },
-  { name: "Settings", href: "#" },
   { name: "Sign out", href: "#" },
 ];
 
@@ -84,7 +85,50 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return { activeOrg, user, subscription, orgsList };
 }
 
-export default function Example() {
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get(INTENTS.INTENT);
+
+  if (intent === INTENTS.CHANGE_WORKSPACE) {
+    const workspace = formData.get(CHANGE_WORKSPACE_FORM.WORKSPACE_ID);
+
+    if (workspace === CHANGE_WORKSPACE_FORM.NEW_VALUE) {
+      // This case is handled by the dialog form, not here
+      return null;
+    }
+
+    // Find the organization to get its slug
+    const selectedOrg = await prisma.organization.findUnique({
+      where: { id: String(workspace) },
+      select: { id: true, slug: true },
+    });
+
+    if (selectedOrg) {
+      await auth.api.setActiveOrganization({
+        body: {
+          organizationId: selectedOrg.id,
+          organizationSlug: selectedOrg.slug ?? undefined,
+        },
+        headers: request.headers,
+      });
+    }
+  }
+
+  if (intent === INTENTS.CREATE_WORKSPACE) {
+    const workspaceName = formData.get(CREATE_WORKSPACE_FORM.NAME);
+    
+    if (workspaceName) {
+      // TODO: Implement workspace/organization creation logic
+      // This would involve creating a new organization in the database
+      // and setting it as the active organization
+      console.log("Creating workspace:", workspaceName);
+    }
+  }
+
+  return null;
+}
+
+export default function Layout() {
   const { activeOrg, orgsList } = useLoaderData<typeof loader>();
 
   return (

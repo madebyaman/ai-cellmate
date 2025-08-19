@@ -21,7 +21,7 @@ import Label from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
 import { createOrganizationSchema } from "~/schema/organization";
 import { requireAuth } from "~/utils/auth.server";
-import { ROUTES } from "~/utils/constants";
+import { INTENTS, ROUTES } from "~/utils/constants";
 import type { Route } from "./+types/create-organization";
 import { LogOut } from "lucide-react";
 
@@ -36,6 +36,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export async function clientAction({ request }: Route.ClientActionArgs) {
   const formData = await request.formData();
+  const intent = formData.get(INTENTS.INTENT);
+
   const submission = parseWithZod(formData, {
     schema: createOrganizationSchema,
   });
@@ -49,23 +51,26 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   let shouldClearForm = false;
   const { name, slug, userName } = submission.value;
 
-  // Update user name first
-  await authClient.updateUser(
-    { name: userName },
-    {
-      onError: (ctx) => {
-        toast.error("Failed to update user name", {
-          description: ctx.error.message,
-        });
-        return;
+  // Update user name first (only for regular organization creation, not from dropdown)
+  if (userName && intent !== INTENTS.CREATE_WORKSPACE) {
+    await authClient.updateUser(
+      { name: userName },
+      {
+        onError: (ctx) => {
+          toast.error("Failed to update user name", {
+            description: ctx.error.message,
+          });
+          return;
+        },
       },
-    },
-  );
+    );
+  }
 
   await authClient.organization.create(
     { name, slug },
     {
       onSuccess: (data) => {
+        console.log("data", data);
         const id = data?.id ?? null;
         const slug = data?.slug ?? null;
         if (!id || !slug) throw new Error("Error setting active org"); // TODO: fix later
