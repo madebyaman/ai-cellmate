@@ -22,8 +22,8 @@ export default [
   // route("app", "routes/middleware.tsx"),
 
   // Protected routes with middleware checks
-  layout("./routes/layout.tsx", [
-    route("app", "./routes/dashboard.tsx"),
+  route("app", "./routes/layout.tsx", [
+    index("./routes/dashboard.tsx"),
     route("settings", "./routes/settings.tsx", [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),

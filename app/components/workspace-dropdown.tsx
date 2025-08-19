@@ -38,12 +38,14 @@ import {
 export default function WorkspaceDropdown({
   orgs,
   selectedOrgId,
+  hideCreateOption = false,
 }: {
   orgs: {
     id: Organization["id"];
     name: Organization["name"];
   }[];
-  selectedOrgId: Organization["id"];
+  selectedOrgId: Organization["id"] | null;
+  hideCreateOption?: boolean;
 }) {
   const submit = useSubmit();
   const navigation = useNavigation();
@@ -60,7 +62,7 @@ export default function WorkspaceDropdown({
   });
 
   const handleValueChange = (value: string) => {
-    if (value === CHANGE_WORKSPACE_FORM.NEW_VALUE) {
+    if (value === CHANGE_WORKSPACE_FORM.NEW_VALUE && !hideCreateOption) {
       setShowNewDialog(true);
     } else {
       // Submit the form for workspace change
@@ -84,7 +86,7 @@ export default function WorkspaceDropdown({
         <Select
           disabled={isChanging}
           name={CHANGE_WORKSPACE_FORM.WORKSPACE_ID}
-          value={selectedOrgId ?? orgs[0].id}
+          defaultValue={selectedOrgId ?? orgs[0].id}
           onValueChange={handleValueChange}
         >
           <SelectTrigger className="w-full md:w-48 text-inherit bg-inherit data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed">
@@ -100,22 +102,25 @@ export default function WorkspaceDropdown({
                 {project.name}
               </SelectItem>
             ))}
-            <SelectSeparator />
-
-            <BareSelectItem
-              value={CHANGE_WORKSPACE_FORM.NEW_VALUE}
-              className="items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              <SelectItemText>New Workspace</SelectItemText>
-            </BareSelectItem>
+            {!hideCreateOption && (
+              <>
+                <SelectSeparator />
+                <BareSelectItem
+                  value={CHANGE_WORKSPACE_FORM.NEW_VALUE}
+                  className="items-center gap-2"
+                >
+                  <Plus className="w-4 h-4" />
+                  <SelectItemText>New Workspace</SelectItemText>
+                </BareSelectItem>
+              </>
+            )}
           </SelectContent>
         </Select>
       </Form>
 
       <Dialog open={showNewDialog} onOpenChange={setShowNewDialog}>
         <DialogContent className="sm:max-w-[425px]">
-          <Form method="post" action={ROUTES.CREATE_ORGANIZATION} {...getFormProps(form)}>
+          <Form method="post" {...getFormProps(form)}>
             <input
               type="hidden"
               name={INTENTS.INTENT}
@@ -130,9 +135,7 @@ export default function WorkspaceDropdown({
             </DialogHeader>
             <div className="grid gap-4 mt-4">
               <div className="grid gap-1">
-                <Label htmlFor={fields.name.id}>
-                  Workspace Name
-                </Label>
+                <Label htmlFor={fields.name.id}>Workspace Name</Label>
                 <Input
                   placeholder="Enter workspace name"
                   errors={fields.name.errors}
@@ -140,9 +143,7 @@ export default function WorkspaceDropdown({
                 />
               </div>
               <div className="grid gap-1">
-                <Label htmlFor={fields.slug.id}>
-                  Workspace Slug
-                </Label>
+                <Label htmlFor={fields.slug.id}>Workspace Slug</Label>
                 <Input
                   placeholder="Enter workspace slug"
                   errors={fields.slug.errors}

@@ -22,6 +22,7 @@ import { authClient } from "~/lib/auth-client";
 import { createOrganizationSchema } from "~/schema/organization";
 import { requireAuth } from "~/utils/auth.server";
 import { INTENTS, ROUTES } from "~/utils/constants";
+import { OrganizationCreationError } from "~/utils/errors";
 import type { Route } from "./+types/create-organization";
 import { LogOut } from "lucide-react";
 
@@ -69,11 +70,17 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   await authClient.organization.create(
     { name, slug },
     {
-      onSuccess: (data) => {
-        console.log("data", data);
+      onSuccess: ({ data }) => {
         const id = data?.id ?? null;
         const slug = data?.slug ?? null;
-        if (!id || !slug) throw new Error("Error setting active org"); // TODO: fix later
+        console.log("data", data);
+        if (!id || !slug) {
+          throw new OrganizationCreationError(
+            "Error setting active org: missing id or slug from organization creation response",
+            data,
+            "create-organization.tsx:onSuccess",
+          );
+        }
         shouldClearForm = true;
 
         // Set the newly created organization as active

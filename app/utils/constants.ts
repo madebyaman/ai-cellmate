@@ -6,8 +6,8 @@ export const ROUTES = {
   BILLING: "/billing",
   LOGOUT: "/logout",
   DASHBOARD: "/app",
-  SETTINGS: `/settings`,
-  BILLING_SETTINGS: `/settings/billing`,
+  SETTINGS: `/app/settings`,
+  BILLING_SETTINGS: `/app/settings/billing`,
 } as const;
 
 export const INTENTS = {
@@ -22,6 +22,6 @@ export const CHANGE_WORKSPACE_FORM = {
 };
 
 export const CREATE_WORKSPACE_FORM = {
-  NAME: "workspace-name",
-  SLUG: "workspace-slug",
+  NAME: "name",
+  SLUG: "slug",
 };

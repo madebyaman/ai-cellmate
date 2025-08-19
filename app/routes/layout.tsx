@@ -30,7 +30,7 @@ import {
   getSubscription,
   getOrganizationCredits,
 } from "~/utils/auth.server";
-import { CHANGE_WORKSPACE_FORM, INTENTS } from "~/utils/constants";
+import { CHANGE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
 
 const user = {
   name: "Tom Cook",
@@ -42,11 +42,11 @@ const user = {
 const navigation = [
   {
     name: "Dashboard",
-    href: "/app",
+    href: ROUTES.DASHBOARD,
   },
   {
     name: "Settings",
-    href: `/settings`,
+    href: ROUTES.SETTINGS,
   },
 ];
 
