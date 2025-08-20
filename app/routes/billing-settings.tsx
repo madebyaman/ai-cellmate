@@ -1,45 +1,147 @@
 import { Calendar, Plus } from "lucide-react";
-import {
-  UNSAFE_invariant,
-  useLoaderData,
-  type LoaderFunctionArgs,
-} from "react-router";
-import { BillingPlans } from "~/components/billing-plans";
+import type { ActionFunctionArgs } from "react-router";
+import { Form, redirect, UNSAFE_invariant, useNavigation } from "react-router";
 import { prisma } from "~/lib/prisma.server";
-import { getActiveOrganizationId } from "~/utils/auth.server";
+import {
+  createBillingPortalSession,
+  createCheckoutSession,
+  upgradeSubscription,
+} from "~/lib/stripe.server";
+import { requireActiveOrg } from "~/utils/auth.server";
 import { getUserSubscription } from "~/utils/sub.server";
+import { BOOSTER_PLAN_NAME, INTENTS, PLANS } from "~/utils/constants";
 import { Button } from "../components/ui/button";
+import { useAppLayoutLoaderData } from "./layout";
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const activeOrg = await getActiveOrganizationId(request);
-  UNSAFE_invariant(activeOrg, "No active org found");
-  const sub = await getUserSubscription(request, activeOrg);
+export async function action({ request }: ActionFunctionArgs) {
+  const formData = await request.formData();
+  const intent = formData.get(INTENTS.INTENT);
+  const currentUrl = new URL(request.url);
+  const returnUrl = `${currentUrl.origin}${currentUrl.pathname}`;
 
-  const user = await prisma.organization.findUnique({
-    where: { id: activeOrg },
-    select: {
-      id: true,
-      credits: true,
-    },
+  // Get the active organization and user session
+  const { activeOrg, user } = await requireActiveOrg(request);
+  const activeOrganization = await prisma.organization.findUnique({
+    where: { id: activeOrg.id },
+    select: { stripeCustomerId: true },
   });
 
-  if (!user) {
-    throw new Response("User not found", { status: 404 });
+  const customerId = activeOrganization?.stripeCustomerId;
+  UNSAFE_invariant(customerId, "No customer id");
+
+  // Get the active subscription for upgrade and credit purchase validation
+  const sub = await getUserSubscription(activeOrg.id);
+
+  try {
+    switch (intent) {
+      case INTENTS.BILLING_PORTAL: {
+        try {
+          const data = await createBillingPortalSession({
+            customerId,
+            returnUrl,
+          });
+
+          if (data?.url) {
+            return redirect(data.url);
+          }
+        } catch (error) {
+          console.error("Billing portal error:", error);
+        }
+        return redirect(returnUrl);
+      }
+      case INTENTS.UPGRADE_TO_PRO: {
+        if (!sub) {
+          // If no subscription found, create a checkout session for Pro plan
+          const plan = PLANS.find((p) => p.id === "pro");
+          UNSAFE_invariant(plan?.priceId, "No price id for pro plan");
+
+          const data = await createCheckoutSession({
+            priceId: plan.priceId,
+            successUrl: returnUrl,
+            cancelUrl: returnUrl,
+            mode: "subscription",
+            customerId,
+            organizationId: activeOrg.id,
+            plan: "pro",
+          });
+
+          if (data?.url) {
+            return redirect(data.url);
+          }
+        } else {
+          // If subscription exists, upgrade it
+          try {
+            const plan = PLANS.find((p) => p.id === "pro");
+            UNSAFE_invariant(plan?.priceId, "No price id to upgrade");
+            const data = await upgradeSubscription({
+              subscriptionId: sub.stripeSubscriptionId,
+              newPriceId: plan?.priceId,
+              returnUrl: returnUrl,
+            });
+
+            if (data?.url) {
+              return redirect(data.url);
+            }
+          } catch (error) {
+            console.error("Upgrade error:", error);
+          }
+        }
+        return redirect(returnUrl);
+      }
+      case INTENTS.BUY_CREDITS: {
+        // User must have an active subscription to buy credits
+        if (!sub) {
+          throw new Error("Active subscription required to purchase credits");
+        }
+
+        const boosterPlan = PLANS.find((plan) => plan.id === BOOSTER_PLAN_NAME);
+        if (!boosterPlan?.priceId) {
+          throw new Error("Credit purchase unavailable");
+        }
+
+        const { url } = await createCheckoutSession({
+          priceId: boosterPlan.priceId,
+          successUrl: returnUrl,
+          cancelUrl: returnUrl,
+          mode: "payment",
+          customerId,
+          organizationId: activeOrg.id,
+          plan: BOOSTER_PLAN_NAME,
+        });
+
+        if (url) {
+          return redirect(url);
+        }
+
+        return redirect(returnUrl);
+      }
+    }
+  } catch (error) {
+    console.error("Billing action error:", error);
+    // In a real app, you might want to set a flash message or handle errors differently
+    return redirect(returnUrl);
   }
 
-  const userCredits = user.credits;
-
-  return {
-    creditsLeft: userCredits?.amount || 0,
-    planName: sub[0]?.plan,
-  };
+  return redirect(returnUrl);
 }
 
 export default function BillingSection() {
-  const { planName, creditsLeft } = useLoaderData<typeof loader>();
-  console.log("data", planName, creditsLeft);
-  // const { planName, creditsLeft, isCancelled, ...rest } = billingData;
-  const isCancelled = false;
+  const { credits, subscription } = useAppLayoutLoaderData();
+  const navigation = useNavigation();
+
+  const creditsLeft = credits || 0;
+  const isLowCredits = creditsLeft < 100;
+  const hasActiveSubscription = subscription;
+  const currentPlan = hasActiveSubscription
+    ? PLANS.find((plan) => plan.id === subscription?.plan)
+    : null;
+  const planName = currentPlan?.name || "Free";
+  const isCancelled =
+    hasActiveSubscription && subscription?.cancelAtPeriodEnd === true;
+
+  // Show upgrade messaging only for free or starter plans
+  const shouldShowUpgradeMessage =
+    !hasActiveSubscription || currentPlan?.id === "starter";
 
   return (
     <div className="bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl">
@@ -49,43 +151,59 @@ export default function BillingSection() {
             Billing & Plan
           </h2>
           <p className="px-2 py-[1px] text-sm font-medium rounded bg-green-200 text-green-800">
-            Pro
+            {planName}
           </p>
         </div>
         <p className="text-sm text-gray-600 mb-6">
           Manage your subscription and credits
         </p>
 
-        <div className="flex gap-2 justify-between items-center">
-          <p className="text-sm text-gray-400 mt-1">3,750 / 5,000 credits</p>
-          <p className="text-sm text-gray-400 mt-1">1,250 remaining</p>
-        </div>
-        <div className="mt-1 overflow-hidden rounded-full bg-gray-200">
-          <div
-            style={{ width: "37.5%" }}
-            className="h-2 rounded-full bg-indigo-600"
-          />
+        <div className="flex items-center gap-2 mt-1">
+          <p className="text-sm text-gray-400">
+            {creditsLeft.toLocaleString()} credits remaining
+          </p>
+          {isLowCredits && (
+            <span className="px-2 py-[1px] text-xs font-medium rounded bg-red-100 text-red-800">
+              Low Credits
+            </span>
+          )}
         </div>
 
-        <div className="flex items-center gap-2 mt-6">
-          <Calendar className="h-4 w-4 text-gray-500" />
-          {/*<p className="text-sm text-gray-600">
-            {isCancelled ? (
-              <>Cancels on {rest?.cancelDate ?? ""}</>
-            ) : (
-              <>Renews on {rest?.renewalDate ?? ""}</>
-            )}
-          </p>*/}
-        </div>
+        {hasActiveSubscription && (
+          <div className="flex items-center gap-2 mt-6">
+            <Calendar className="h-4 w-4 text-gray-500" />
+            <p className="text-sm text-gray-600">
+              {isCancelled ? (
+                <>
+                  Cancels on{" "}
+                  {subscription?.periodEnd
+                    ? new Date(subscription.periodEnd).toLocaleDateString()
+                    : "N/A"}
+                </>
+              ) : (
+                <>
+                  Renews on{" "}
+                  {subscription?.periodEnd
+                    ? new Date(subscription.periodEnd).toLocaleDateString()
+                    : "N/A"}
+                </>
+              )}
+            </p>
+          </div>
+        )}
 
-        <div className="flex flex-col gap-1 mt-6">
-          <p className="text-sm font-semibold text-gray-900">
-            Upgrade to Pro ($199 / mo) to unlock:
-          </p>
-          <p className="text-sm text-gray-600">
-            500 monthly credits and discounted extra credits
-          </p>
-        </div>
+        <hr className="my-6 border-gray-200" />
+
+        {shouldShowUpgradeMessage && (
+          <div className="flex flex-col gap-1 mt-6">
+            <p className="text-sm font-semibold text-gray-900">
+              Upgrade to Pro ($199 / mo) to unlock:
+            </p>
+            <p className="text-sm text-gray-600">
+              500 monthly credits and discounted extra credits
+            </p>
+          </div>
+        )}
 
         <div className="flex justify-between gap-2 items-center">
           <div className="flex flex-col gap-1 mt-6">
@@ -93,13 +211,27 @@ export default function BillingSection() {
               Need more credits?
             </p>
             <p className="text-sm text-gray-600">
-              Get 500 additional credits for $50
+              Get 200 additional credits for $50
             </p>
           </div>
-          <Button variant="outline" className="py-1.5 px-4 h-auto">
-            <Plus className="size-4" />
-            Buy Credits
-          </Button>
+          <Form method="post">
+            <input
+              type="hidden"
+              name={INTENTS.INTENT}
+              value={INTENTS.BUY_CREDITS}
+            />
+            <Button
+              type="submit"
+              variant="outline"
+              className="py-1.5 px-4 h-auto"
+              disabled={
+                navigation.state === "submitting" || !hasActiveSubscription
+              }
+            >
+              <Plus className="size-4" />
+              Buy Credits
+            </Button>
+          </Form>
         </div>
 
         <div className="flex flex-col gap-1 mt-6">
@@ -113,15 +245,34 @@ export default function BillingSection() {
       </div>
 
       <div className="flex items-center justify-end gap-x-6 border-t border-gray-900/10 px-4 py-4 sm:px-8">
-        <button type="button" className="text-sm font-semibold text-gray-900">
-          Manage Billing
-        </button>
-        <button
-          type="submit"
-          className="rounded-md bg-indigo-600 px-3 py-2 text-sm font-semibold text-white shadow-xs hover:bg-indigo-500 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
-        >
-          Upgrade to Pro
-        </button>
+        {hasActiveSubscription && (
+          <Form method="post">
+            <input
+              type="hidden"
+              name={INTENTS.INTENT}
+              value={INTENTS.BILLING_PORTAL}
+            />
+            <Button
+              type="submit"
+              disabled={navigation.state === "submitting"}
+              variant={shouldShowUpgradeMessage ? "outline" : "default"}
+            >
+              Manage Billing
+            </Button>
+          </Form>
+        )}
+        {shouldShowUpgradeMessage && (
+          <Form method="post">
+            <input
+              type="hidden"
+              name={INTENTS.INTENT}
+              value={INTENTS.UPGRADE_TO_PRO}
+            />
+            <Button disabled={navigation.state === "submitting"}>
+              Upgrade to Pro
+            </Button>
+          </Form>
+        )}
       </div>
     </div>
   );

@@ -15,12 +15,6 @@ export async function requireAnonymous(request: Request) {
   if (session) {
     const orgId = await getActiveOrganizationId(request);
     if (!orgId) throw redirect(ROUTES.APP);
-    const org = await verifyUserAccessToOrganization({
-      userId: session.user.id,
-      orgId: orgId ?? undefined,
-    });
-    if (!org.slug) throw new Error("Expected slug of workspace");
-    throw redirect(ROUTES.DASHBOARD);
   }
   return session;
 }
@@ -43,21 +37,10 @@ export async function getActiveOrganizationId(request: Request) {
   return orgId;
 }
 
-export async function requireOrganization(request: Request) {
-  const { getFirstOrganization } = await import("~/utils/organization.server");
-
-  const firstOrg = await getFirstOrganization(request);
-  if (!firstOrg) {
-    throw redirect(ROUTES.CREATE_ORGANIZATION);
-  }
-
-  return firstOrg;
-}
-
 export async function requireSubscription(request: Request, orgId: string) {
   const { getUserSubscription } = await import("~/utils/sub.server");
 
-  const subscription = await getUserSubscription(request, orgId);
+  const subscription = await getUserSubscription(orgId);
   if (!subscription) {
     throw redirect(ROUTES.BILLING);
   }
@@ -68,27 +51,27 @@ export async function requireSubscription(request: Request, orgId: string) {
 export async function getSubscription(request: Request, orgId: string) {
   const { getUserSubscription } = await import("~/utils/sub.server");
 
-  const subscription = await getUserSubscription(request, orgId);
+  const subscription = await getUserSubscription(orgId);
   return subscription;
 }
 
 export async function getOrganizationCredits(request: Request, orgId: string) {
   const { prisma } = await import("~/lib/prisma.server");
-  
+
   const credits = await prisma.credits.findUnique({
     where: { organizationId: orgId },
     select: { amount: true },
   });
-  
+
   return credits?.amount ?? 0;
 }
 
 export type SubscriptionError = "invalid-sub" | "out-of-credits";
 
 export async function validateSubscriptionAndCredits(
-  request: Request, 
-  orgId: string, 
-  requiredCredits: number = 1
+  request: Request,
+  orgId: string,
+  requiredCredits: number = 1,
 ): Promise<{ valid: boolean; error?: SubscriptionError }> {
   const [subscription, credits] = await Promise.all([
     getSubscription(request, orgId),
@@ -118,6 +101,9 @@ export async function requireActiveOrg(request: Request) {
   // Check if user has any organizations
   if (orgsList.length === 0) {
     throw redirect(ROUTES.CREATE_ORGANIZATION);
+  }
+  if (orgsList.length > 1) {
+    console.log("User has more than one workspace", user);
   }
 
   const firstOrg = orgsList[0];

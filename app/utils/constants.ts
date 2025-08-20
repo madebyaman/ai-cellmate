@@ -2,17 +2,22 @@ export const ROUTES = {
   HOME: "/",
   APP: "/app", // This now redirects to first organization
   LOGIN: "/login",
-  CREATE_ORGANIZATION: "/create-organization",
+  CREATE_ORGANIZATION: "/create-workspace",
   BILLING: "/billing",
   LOGOUT: "/logout",
   DASHBOARD: "/app",
   SETTINGS: `/app/settings`,
   BILLING_SETTINGS: `/app/settings/billing`,
+  ACCEPT_INVITATION: "/accept-invitation",
 } as const;
 
 export const INTENTS = {
   CHANGE_WORKSPACE: "change-workspace",
   CREATE_WORKSPACE: "create-workspace",
+  BILLING_PORTAL: "billing-portal",
+  UPGRADE_TO_PRO: "upgrade-to-pro",
+  BUY_CREDITS: "buy-credits",
+  INVITE_MEMBER: "invite-member",
   INTENT: "intent",
 };
 
@@ -25,3 +30,32 @@ export const CREATE_WORKSPACE_FORM = {
   NAME: "name",
   SLUG: "slug",
 };
+
+export const INVITE_MEMBER_FORM = {
+  EMAIL: "email",
+};
+
+export const BOOSTER_PLAN_NAME = "booster";
+
+export const PLANS = [
+  {
+    id: "starter",
+    name: "Starter",
+    priceId: "price_1Rx3glSE1YMlG7zxDfVd4c0L",
+    credits: 200,
+    teamMembers: 1,
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    priceId: "price_1Rx3hxSE1YMlG7zxROgqgr32",
+    credits: 500,
+    teamMembers: 5,
+  },
+  {
+    id: BOOSTER_PLAN_NAME,
+    name: "Booster",
+    priceId: "price_1Rx3iLSE1YMlG7zxAqGgw0dM",
+    credits: 200,
+  },
+];

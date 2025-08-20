@@ -22,4 +22,12 @@ export const createOrganizationSchema = z.object({
     .optional(),
 });
 
+export const inviteMemberSchema = z.object({
+  email: z
+    .string({ required_error: "Email is required" })
+    .email("Please enter a valid email address")
+    .min(1, "Email is required"),
+});
+
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;

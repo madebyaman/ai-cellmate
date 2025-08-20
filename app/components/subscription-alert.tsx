@@ -5,11 +5,32 @@ import { ROUTES } from "~/utils/constants";
 
 interface SubscriptionAlertProps {
   onDismiss?: () => void;
+  credits?: number;
+  hasValidSubscription?: boolean;
 }
 
 export default function SubscriptionAlert({
   onDismiss,
+  credits = 0,
+  hasValidSubscription = false,
 }: SubscriptionAlertProps) {
+  const hasNoCredits = credits <= 0;
+  
+  // Show banner only if: (no credits & no sub) OR (no credits but has sub)
+  // Hide if: has credits and no sub
+  const shouldShowBanner = (hasNoCredits && !hasValidSubscription) || (hasNoCredits && hasValidSubscription);
+  
+  if (!shouldShowBanner) {
+    return null;
+  }
+  
+  // Priority: no valid subscription first, then no credits
+  const message = !hasValidSubscription
+    ? "Your subscription has expired or is not active. Please update your billing to continue using all features."
+    : "You have no credits remaining. Add more credits to continue using AI features.";
+  
+  const linkText = !hasValidSubscription ? "Update Billing" : "Add Credits";
+  const linkTo = !hasValidSubscription ? ROUTES.BILLING : ROUTES.BILLING_SETTINGS;
   return (
     <div className="bg-yellow-50 border-l-4 border-yellow-400">
       <div className="flex mx-auto max-w-7xl px-4">
@@ -18,15 +39,14 @@ export default function SubscriptionAlert({
         </div>
         <div className="ml-3 flex-1 py-4">
           <p className="text-sm text-yellow-700">
-            Your subscription has expired or is not active. Please update your
-            billing to continue using all features.
+            {message}
           </p>
           <div className="mt-2">
             <Link
-              to={ROUTES.BILLING_SETTINGS}
+              to={linkTo}
               className="font-medium text-yellow-700 underline hover:text-yellow-600 text-sm"
             >
-              Update Billing
+              {linkText}
             </Link>
           </div>
         </div>

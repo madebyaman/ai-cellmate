@@ -22,8 +22,6 @@ model User {
   sessions      Session[]
   accounts      Account[]
 
-  stripeCustomerId String?
-
   members     Member[]
   invitations Invitation[]
 
@@ -92,28 +90,32 @@ model Credits {
 model Subscription {
   id                   String    @id
   plan                 String
-  referenceId          String
-  stripeCustomerId     String?
-  stripeSubscriptionId String?
+  organizationId       String
+  stripeCustomerId     String
+  stripeSubscriptionId String
   status               String?
   periodStart          DateTime?
   periodEnd            DateTime?
   cancelAtPeriodEnd    Boolean?
   seats                Int?
 
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   @@map("subscription")
 }
 
 model Organization {
-  id          String       @id
-  name        String
-  slug        String?
-  logo        String?
-  createdAt   DateTime
-  metadata    String?
-  members     Member[]
-  invitations Invitation[]
-  credits     Credits?
+  id               String         @id
+  name             String
+  slug             String?
+  logo             String?
+  createdAt        DateTime
+  metadata         String?
+  members          Member[]
+  invitations      Invitation[]
+  credits          Credits?
+  stripeCustomerId String?
+  Subscription     Subscription[]
 
   @@unique([slug])
   @@map("organization")

@@ -1,21 +1,18 @@
-import { redirect } from "react-router";
-import { auth } from "~/lib/auth.server";
-import { ROUTES } from "./constants";
+import { prisma } from "~/lib/prisma.server";
 
-export async function getUserSubscription(request: Request, orgId: string) {
-  // Get the user's active organization
-  const subs = await auth.api.listActiveSubscriptions({
-    query: {
-      referenceId: orgId,
+export async function getUserSubscription(orgId: string) {
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      organizationId: orgId,
+      OR: [
+        { status: "active" },
+        { status: "trialing" },
+        {
+          AND: [{ status: "canceled" }, { periodEnd: { gte: new Date() } }],
+        },
+      ],
     },
-    // This endpoint requires session cookies.
-    headers: request.headers,
   });
-  console.log("The org %s has subs", orgId, subs);
 
-  if (!subs || subs.length === 0) {
-    return null;
-  }
-
-  return subs;
+  return subscription;
 }

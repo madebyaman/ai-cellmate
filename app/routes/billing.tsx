@@ -1,6 +1,7 @@
 import { LogOut } from "lucide-react";
 import {
   redirect,
+  UNSAFE_invariant,
   useLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -14,24 +15,31 @@ import Heading from "~/components/ui/heading";
 import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
 import { prisma } from "~/lib/prisma.server";
+import { createCheckoutSession } from "~/lib/stripe.server";
 import { getActiveOrganizationId, requireActiveOrg } from "~/utils/auth.server";
-import { CHANGE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
+import {
+  CHANGE_WORKSPACE_FORM,
+  INTENTS,
+  PLANS,
+  ROUTES,
+} from "~/utils/constants";
 import { getUserSubscription } from "~/utils/sub.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { activeOrg, orgsList, user } = await requireActiveOrg(request);
+  const { activeOrg, orgsList } = await requireActiveOrg(request);
   if (activeOrg.id) {
-    const sub = await getUserSubscription(request, activeOrg.id);
+    const sub = await getUserSubscription(activeOrg.id);
     if (sub) throw redirect(ROUTES.DASHBOARD);
   }
 
-  return { activeOrg, orgsList };
+  return { orgsList, activeOrg };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get(INTENTS.INTENT);
 
+  // TODO: Re-enable when we support multiple organizations
   if (intent === INTENTS.CHANGE_WORKSPACE) {
     const workspace = formData.get(CHANGE_WORKSPACE_FORM.WORKSPACE_ID);
     console.log("workspace", workspace);
@@ -63,20 +71,32 @@ export async function action({ request }: ActionFunctionArgs) {
   const plan = formData.get("plan");
   if (typeof plan !== "string") throw new Error("Submitted an invalid value");
   const orgId = await getActiveOrganizationId(request);
+  const activeOrganization = await prisma.organization.findUnique({
+    where: { id: orgId ?? undefined },
+    select: { stripeCustomerId: true },
+  });
+  const currentUrl = new URL(request.url);
+  const returnUrl = `${currentUrl.origin}${ROUTES.DASHBOARD}`;
+
+  const customerId = activeOrganization?.stripeCustomerId;
+  UNSAFE_invariant(customerId, "No customer id");
 
   try {
-    const data = await auth.api.upgradeSubscription({
-      body: {
-        plan: plan,
-        referenceId: "g2Y6FimGKGrHy7wTXxwyEHAr54oc3Ott",
-        successUrl: "http://localhost:5173/billing",
-        cancelUrl: "http://localhost:5173/billing",
-      },
-      headers: request.headers,
+    const planToSub = PLANS.find((p) => p.id === plan);
+    UNSAFE_invariant(planToSub?.priceId, "No price id for pro plan");
+
+    const data = await createCheckoutSession({
+      priceId: planToSub.priceId,
+      successUrl: returnUrl,
+      cancelUrl: returnUrl,
+      mode: "subscription",
+      customerId,
+      organizationId: orgId ?? "",
+      plan: planToSub.id,
     });
     const url = data.url;
     if (!url) throw new Error("Error checkout");
-    throw redirect(url);
+    return redirect(url);
   } catch (e) {
     console.log("ERROR", e);
   }
@@ -90,6 +110,7 @@ export default function BillingPage() {
       <AuthShell.Navigation>
         <div className="flex gap-4">
           <AuthShell.Logo />
+          {/* TODO: Re-enable when we support multiple organizations */}
           {orgsList.length > 1 && (
             <WorkspaceDropdown
               selectedOrgId={activeOrg.id ?? null}
