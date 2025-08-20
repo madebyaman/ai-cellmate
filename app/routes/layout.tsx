@@ -4,6 +4,7 @@ import {
   Link,
   NavLink,
   Outlet,
+  UNSAFE_invariant,
   useFetcher,
   useLoaderData,
   useRouteLoaderData,
@@ -19,16 +20,16 @@ import {
   DropdownMenuTrigger,
 } from "~/components/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
-import { Button } from "~/components/ui/button";
 import SubscriptionAlert from "~/components/subscription-alert";
+import { Button } from "~/components/ui/button";
 import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
 import { prisma } from "~/lib/prisma.server";
 import { createOrganizationSchema } from "~/schema/organization";
 import {
-  requireActiveOrg,
-  getSubscription,
   getOrganizationCredits,
+  getSubscription,
+  requireActiveOrg,
 } from "~/utils/auth.server";
 import { CHANGE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
 
@@ -56,7 +57,7 @@ const userNavigation = [
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const { activeOrg, orgsList, user } = await requireActiveOrg(request);
+  const { activeOrg, user, orgsList } = await requireActiveOrg(request);
 
   const [subscription, credits] = await Promise.all([
     getSubscription(request, activeOrg.id),
@@ -70,6 +71,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get(INTENTS.INTENT);
 
+  // TODO: Re-enable when we support multiple organizations
   if (intent === INTENTS.CHANGE_WORKSPACE) {
     const workspace = formData.get(CHANGE_WORKSPACE_FORM.WORKSPACE_ID);
 
@@ -135,7 +137,6 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Layout() {
   const { activeOrg, orgsList, subscription, credits } =
     useLoaderData<typeof loader>();
-  console.log("credits", credits);
 
   return (
     <div className="min-h-full flex flex-col">
@@ -155,6 +156,7 @@ export default function Layout() {
                   className="hidden h-8 w-auto lg:block"
                 />
               </div>
+              {/* TODO: Re-enable when we support multiple organizations */}
               <div className="flex items-center">
                 <WorkspaceDropdown
                   selectedOrgId={activeOrg.id}
@@ -166,7 +168,7 @@ export default function Layout() {
                   <NavLink
                     key={item.name}
                     to={item.href}
-                    end={item.href === "" ? true : false}
+                    end={item.href === "/app" ? true : false}
                     className={({ isActive, isPending }) =>
                       [
                         isPending || isActive
@@ -285,7 +287,10 @@ export default function Layout() {
           </div>
         </div>
       </nav>
-      {!subscription && <SubscriptionAlert />}
+      <SubscriptionAlert
+        credits={credits}
+        hasValidSubscription={!!subscription}
+      />
 
       <div className="py-10 bg-gray-50 flex-1">
         <Outlet />
@@ -451,5 +456,7 @@ function FeedbackButton() {
 }
 
 export function useAppLayoutLoaderData() {
-  return useRouteLoaderData<typeof loader>("routes/layout");
+  const data = useRouteLoaderData<typeof loader>("routes/layout");
+  UNSAFE_invariant(data, "No data found");
+  return data;
 }

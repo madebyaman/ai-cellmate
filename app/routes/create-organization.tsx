@@ -1,7 +1,7 @@
 import { getFormProps, getInputProps, useForm } from "@conform-to/react";
-import { useSpinDelay } from "spin-delay";
-import { useEffect } from "react";
 import { parseWithZod } from "@conform-to/zod";
+import { LogOut } from "lucide-react";
+import { useEffect } from "react";
 import {
   redirect,
   useFetcher,
@@ -11,6 +11,7 @@ import {
 import { AuthenticityTokenInput } from "remix-utils/csrf/react";
 import { HoneypotInputs } from "remix-utils/honeypot/react";
 import { toast } from "sonner";
+import { useSpinDelay } from "spin-delay";
 import { AuthShell } from "~/components/auth-shell";
 import FormErrors from "~/components/form-errors";
 import { GeneralErrorBoundary } from "~/components/general-error-boundry";
@@ -19,15 +20,24 @@ import Heading from "~/components/ui/heading";
 import Input from "~/components/ui/input";
 import Label from "~/components/ui/label";
 import { authClient } from "~/lib/auth-client";
+import { auth } from "~/lib/auth.server";
 import { createOrganizationSchema } from "~/schema/organization";
 import { requireAuth } from "~/utils/auth.server";
 import { INTENTS, ROUTES } from "~/utils/constants";
 import { OrganizationCreationError } from "~/utils/errors";
 import type { Route } from "./+types/create-organization";
-import { LogOut } from "lucide-react";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const session = await requireAuth(request);
+
+  // Check if user already has a workspace
+  const orgsList = await auth.api.listOrganizations({
+    headers: request.headers,
+  });
+  if (orgsList.length > 0) {
+    throw redirect(ROUTES.DASHBOARD);
+  }
+
   return {
     user: {
       name: session.user.name || "",
@@ -51,6 +61,24 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
 
   let shouldClearForm = false;
   const { name, slug, userName } = submission.value;
+
+  // Check if slug is already taken
+  const { data, error } = await authClient.organization.checkSlug({
+    slug: slug,
+  });
+
+  if (error || !data?.status) {
+    return {
+      submission: submission.reply({
+        fieldErrors: {
+          slug: [
+            "This workspace slug is already taken. Please choose a different one.",
+          ],
+        },
+      }),
+      shouldClearForm: false,
+    };
+  }
 
   // Update user name first (only for regular organization creation, not from dropdown)
   if (userName && intent !== INTENTS.CREATE_WORKSPACE) {
