@@ -146,3 +146,159 @@ model Invitation {
 
   @@map("invitation")
 }
+
+// https://chatgpt.com/share/68a68c81-50c0-800f-94ce-f184b2c5c1f4
+
+model Table {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  uploadKey String?
+
+  // relations
+  rows    Row[]
+  columns Column[]
+  hint    Hint?
+  Run     Run[]
+
+  @@map("table")
+}
+
+model Row {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  position  Int
+  cells     Cell[]
+  hint      Hint?
+  Run       Run[]
+
+  @@unique([tableId, position])
+  @@map("row")
+}
+
+model Column {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  name      String
+  tableId   String
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  position  Int
+  cells     Cell[]
+  hint      Hint?
+  Run       Run[]
+
+  @@unique([tableId, position])
+  @@map("column")
+}
+
+// need cell to keep hint mapped to cell
+model Cell {
+  id           String         @id @default(cuid())
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  rowId        String
+  row          Row            @relation(fields: [rowId], references: [id])
+  columnId     String
+  column       Column         @relation(fields: [columnId], references: [id])
+  cellVersions CellVersions[]
+  hint         Hint?
+  Run          Run[]
+
+  @@unique([rowId, columnId])
+  @@map("cell")
+}
+
+model CellVersions {
+  id         String    @id @default(cuid())
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  picked     Boolean   @default(false)
+  value      String?
+  sourceUrl  String?
+  confidence Int?
+  origin     Origin    @default(AI)
+  pickedAt   DateTime?
+
+  cellId String
+  cell   Cell   @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  runId  String
+  run    Run    @relation(fields: [runId], references: [id])
+
+  @@index([cellId, createdAt])
+  @@index([cellId, picked]) // quick “current value”
+  @@index([runId])
+  @@map("cell_versions")
+}
+
+enum Origin {
+  AI
+  UPLOAD
+  USER_EDIT
+}
+
+// Should the relation be one to one. Or one to many
+model Hint {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // values
+  scope    HintOrRunScope
+  prompt   String?
+  websites String[]
+
+  // relations
+  rowId    String? @unique
+  row      Row?    @relation(fields: [rowId], references: [id])
+  columnId String? @unique
+  column   Column? @relation(fields: [columnId], references: [id])
+  tableId  String? @unique
+  table    Table?  @relation(fields: [tableId], references: [id])
+  cellId   String? @unique
+  cell     Cell?   @relation(fields: [cellId], references: [id])
+}
+
+enum HintOrRunScope {
+  TABLE
+  ROW
+  CELL
+  COLUMN
+}
+
+model Run {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // relations
+  rowId        String?
+  row          Row?           @relation(fields: [rowId], references: [id])
+  columnId     String?
+  column       Column?        @relation(fields: [columnId], references: [id])
+  tableId      String?
+  table        Table?         @relation(fields: [tableId], references: [id])
+  cellId       String?
+  cell         Cell?          @relation(fields: [cellId], references: [id])
+  // also need to keep track of all the cell versions a specific run yielded
+  cellVersions CellVersions[]
+
+  // values
+  scope      HintOrRunScope
+  status     Status         @default(PENDING)
+  error      String?
+  startedAt  DateTime
+  finishedAt DateTime
+}
+
+enum Status {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
