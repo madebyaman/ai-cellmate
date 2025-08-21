@@ -11,6 +11,12 @@ import { createCustomer } from "./stripe.server";
 // const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export const auth = betterAuth({
+  session: {
+    cookieCache: {
+      enabled: true,
+      maxAge: 5 * 60,
+    },
+  },
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
