@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (sub) throw redirect(ROUTES.DASHBOARD);
   }
 
-  return { orgsList, activeOrg };
+  return { orgsList: [], activeOrg: null };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -140,7 +140,7 @@ export default function BillingPage() {
           </p>
         </AuthShell.Header>
 
-        <AuthShell.BorderedContainer>
+        <AuthShell.BorderedContainer className="bg-transparent ring-0 shadow-none">
           <BillingPlans />
         </AuthShell.BorderedContainer>
 
