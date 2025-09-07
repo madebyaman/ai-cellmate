@@ -1,10 +1,23 @@
 import { type ReactNode } from "react";
 import { cn } from "~/utils/misc";
 
-export function AuthShell({ children }: { children: ReactNode }) {
+export function AuthShell({
+  children,
+  className,
+  innerClassName,
+}: {
+  children: ReactNode;
+  className?: string;
+  innerClassName?: string;
+}) {
   return (
-    <div className="min-h-full bg-gray-50">
-      <div className="max-w-7xl mx-auto flex flex-col py-3 sm:px-6 lg:px-8">
+    <div className={cn("min-h-full bg-gray-50", className)}>
+      <div
+        className={cn(
+          "max-w-7xl mx-auto flex flex-col py-3 sm:px-6 lg:px-8",
+          innerClassName,
+        )}
+      >
         {children}
       </div>
     </div>
@@ -21,7 +34,7 @@ function MainContainer({
   return (
     <div
       className={cn(
-        "sm:mx-auto sm:w-full sm:max-w-md flex-1 flex flex-col justify-center gap-4 items-center",
+        "sm:mx-auto sm:w-full flex-1 flex flex-col justify-center gap-4 items-center",
         className,
       )}
     >
@@ -31,26 +44,56 @@ function MainContainer({
 }
 AuthShell.MainContainer = MainContainer;
 
-function Navigation({ children }: { children: ReactNode }) {
+function Navigation({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="sm:items-center flex gap-4 justify-between mb-4">
+    <div
+      className={cn(
+        "sm:items-center flex gap-4 justify-between mb-4",
+        className,
+      )}
+    >
       {children}
     </div>
   );
 }
 AuthShell.Navigation = Navigation;
 
-function Header({ children }: { children: ReactNode }) {
+function Header({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col items-center justify-center">{children}</div>
+    <div className={cn("flex flex-col items-center justify-center", className)}>
+      {children}
+    </div>
   );
 }
 AuthShell.Header = Header;
 
-function BorderedContainer({ children }: { children: ReactNode }) {
+function BorderedContainer({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="flex flex-col">
-      <div className="bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl py-8 px-4 sm:px-10 flex-1 flex flex-col">
+    <div className="flex flex-col w-full">
+      <div
+        className={cn(
+          "bg-white ring-1 shadow-xs ring-gray-900/5 sm:rounded-xl py-8 px-4 sm:px-10 flex-1 flex flex-col",
+          className,
+        )}
+      >
         {children}
       </div>
     </div>
@@ -58,14 +101,22 @@ function BorderedContainer({ children }: { children: ReactNode }) {
 }
 AuthShell.BorderedContainer = BorderedContainer;
 
-function CTA({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col justify-end">{children}</div>;
+function CTA({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex flex-col justify-end", className)}>{children}</div>
+  );
 }
 AuthShell.CTA = CTA;
 
-function AuthLogo() {
+function AuthLogo({ className }: { className?: string }) {
   return (
-    <div className="flex shrink-0 items-center justify-center">
+    <div className={cn("flex shrink-0 items-center justify-center", className)}>
       <img
         alt="Your Company"
         src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
@@ -81,9 +132,15 @@ function AuthLogo() {
 }
 AuthShell.Logo = AuthLogo;
 
-function Social({ children }: { children: ReactNode }) {
+function Social({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div className="mt-6">
+    <div className={cn("mt-6", className)}>
       <div className="relative">
         <div className="absolute inset-0 flex items-center">
           <div className="w-full border-t border-slate-300" />
