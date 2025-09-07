@@ -163,8 +163,8 @@ export default function CreateOrganizationPage({
   }, [actionData?.shouldClearForm]);
 
   return (
-    <AuthShell>
-      <AuthShell.Navigation>
+    <AuthShell className="flex justify-center" innerClassName="w-full">
+      <AuthShell.Navigation className="w-full">
         <AuthShell.Logo />
         <form method="post" action={ROUTES.LOGOUT}>
           <Button variant="link">
@@ -187,7 +187,7 @@ export default function CreateOrganizationPage({
           </p>
         </AuthShell.Header>
 
-        <AuthShell.BorderedContainer>
+        <AuthShell.BorderedContainer className="max-w-lg mx-auto w-full">
           <fetcher.Form
             className="flex flex-col gap-6 justify-center"
             method="POST"
