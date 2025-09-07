@@ -6,6 +6,7 @@ export const ROUTES = {
   BILLING: "/billing",
   LOGOUT: "/logout",
   DASHBOARD: "/app",
+  CSV_VIEW: "/csv-view",
   SETTINGS: `/app/settings`,
   BILLING_SETTINGS: `/app/settings/billing`,
   ACCEPT_INVITATION: "/accept-invitation",

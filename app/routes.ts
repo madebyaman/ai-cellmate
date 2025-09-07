@@ -4,6 +4,7 @@ import {
   layout,
   route,
 } from "@react-router/dev/routes";
+import { ROUTES } from "./utils/constants";
 
 export default [
   // Public routes (no auth required)
@@ -19,6 +20,7 @@ export default [
   route("create-workspace", "routes/create-organization.tsx"),
   route("billing", "./routes/billing.tsx"),
   route("logout", "routes/logout.ts"),
+  route("csv-view", "routes/csv-view.tsx"),
 
   // Redirect route for /app
   // route("app", "routes/middleware.tsx"),
