@@ -45,7 +45,8 @@ npm run postinstall
 - `app/routes/` - React Router route definitions and handlers
 - `app/components/` - Reusable React components and UI elements
 - `app/lib/` - Core libraries (auth, prisma, serper integration)
-- `app/utils/` - Utility functions (auth, email, scraping, etc.)
+- `app/utils/` - Utility functions (auth, email, etc.)
+- `app/agent/` - AI agent architecture and specialized tools
 - `app/queues/` - BullMQ queue configuration and worker definitions
 - `app/queues/workers/` - Background job processors
 - `prisma/` - Database schema and migrations
@@ -55,27 +56,32 @@ npm run postinstall
 The application uses BullMQ workers for processing CSV enrichment jobs:
 
 - **CSV Enrichment Worker** (`app/queues/workers/csv-enrichment.worker.ts`): 
-  - Processes uploaded CSV files
-  - Uses AI agents with web search and scraping tools
-  - Searches web using Serper API (10 results per query)
-  - Scrapes 4-6 most relevant URLs using ScrapingBee
-  - Enriches CSV data with found information
-  - Implements concurrency control with semaphores
+  - Processes uploaded CSV files using the agent loop architecture
+  - Orchestrates multi-cycle enrichment process
+  - Tracks enrichment progress with Langfuse telemetry
+  - Implements smart retry logic and URL deduplication
+  - Uses configurable concurrency for web scraping
 
 - **Worker Process** (`worker.ts`): Standalone process that runs all workers
 
 ### AI Agent Architecture
 
-The CSV enrichment uses AI SDK with structured output and multi-step processing:
+The CSV enrichment uses a modular agent architecture with specialized components:
 
-- **Tools Available**:
-  - `searchWeb`: Serper API integration for web search
-  - `scrapePages`: ScrapingBee bulk scraping with markdown conversion and AI-powered summarization
+- **Agent Loop** (`app/agent/agent-loop.ts`): Orchestrates the entire enrichment process
+- **Query Writer** (`app/agent/query-writer.ts`): Generates strategic search queries for missing data
+- **Search Tool** (`app/agent/search-tool.ts`): Serper API integration for web search
+- **Scraper Tool** (`app/agent/scraper-tool.ts`): Custom scraper with ScrapingBee fallback
+- **Result Extracter** (`app/agent/result-extracter.ts`): Extracts structured data from crawled pages
+- **System Context** (`app/agent/system-context.ts`): Tracks state across enrichment cycles
+
 - **Processing Flow**: 
-  1. Parse CSV into structured row objects
-  2. Generate dynamic Zod schema based on CSV headers  
-  3. Use AI agent with search/scrape tools to fill missing data
-  4. Return enriched data in original CSV structure
+  1. Initialize system context with CSV row data
+  2. Generate targeted search queries using failed query history
+  3. Execute parallel web searches via Serper API
+  4. Deduplicate and scrape URLs with custom scraper + ScrapingBee fallback
+  5. Extract structured data for missing CSV columns
+  6. Repeat cycle up to 2 times if columns remain unfilled
 
 ### Authentication & Security
 

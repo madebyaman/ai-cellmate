@@ -7,15 +7,7 @@ import type {
 } from "../types";
 import { readFile } from "fs/promises";
 import { Langfuse } from "langfuse";
-import { fillRow } from "~/utils/fill-row";
-import {
-  combineResults,
-  calculateResultMetrics,
-} from "~/utils/result-combiner";
-import {
-  evaluateResultsSubjectively,
-  needsOptimization,
-} from "~/utils/subjective-evaluator";
+import { runAgentLoop } from "~/agent/agent-loop";
 import { NodeSDK } from "@opentelemetry/sdk-node";
 import { LangfuseExporter } from "langfuse-vercel";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
@@ -109,110 +101,43 @@ async function processCsvEnrichment(
       });
 
       try {
-        // Step 1: Fill row data
         console.log(`Processing row ${i + 1}/${rows.length}`);
-        let searchQueryRecommendations: string[] = [];
-        let attempt = 0;
-        const maxAttempts = 2; // Original attempt + 1 optimization attempt
-        let currentRow = { ...row }; // Track the current state of the row
 
-        while (attempt < maxAttempts) {
-          attempt++;
-          console.log(`Attempt ${attempt} for row ${i + 1}`);
+        // Use the new agent loop for CSV enrichment
+        const agentResult = await runAgentLoop({
+          row,
+          headers,
+          concurrency: 3, // Default concurrency for scraping
+          langfuseTraceId: rowTrace.id,
+        });
 
-          const { result: enrichedData, searchQueries } = await fillRow({
-            headers,
-            row: currentRow, // Pass the updated row with previously found data
-            searchQueryRecommendations, // Pass full array instead of single string
-            telemetry: {
-              isEnabled: true,
-              functionId: "fill-row",
-              metadata: {
-                langfuseTraceId: rowTrace.id,
-                attempt,
-              },
-            },
-          });
+        console.log(
+          `Row ${i + 1} completed after ${agentResult.cycles} cycles. Success: ${agentResult.success}`,
+        );
+        console.log(
+          `Missing columns remaining: ${
+            headers.filter(
+              (header) =>
+                !agentResult.enrichedRow[header] ||
+                agentResult.enrichedRow[header].trim() === "" ||
+                agentResult.enrichedRow[header] === "-",
+            ).length
+          }`,
+        );
 
-          if (!enrichedData || enrichedData.length === 0) {
-            console.log(`No data returned for row ${i + 1}`);
-            break;
-          }
+        enrichedRows.push(agentResult.enrichedRow);
 
-          // Step 2: Combine results with domain authority scoring
-          const combinedResults = combineResults(enrichedData);
-
-          // Step 3: Calculate programmatic metrics
-          // const metrics = calculateResultMetrics(combinedResults);
-
-          // Step 4: Subjective evaluation using LLM
-          const evaluation = await evaluateResultsSubjectively(
-            combinedResults,
-            // metrics,
-            row,
-            searchQueries,
-          );
-
-          // Step 5: Check if optimization is needed
-          const optimization = needsOptimization(evaluation, combinedResults);
-
-          if (!optimization.needsOptimization || attempt === maxAttempts) {
-            // Use the best results from optimization
-            const finalRow = { ...currentRow, ...optimization.bestResults };
-            // Update currentRow for potential next iteration
-            currentRow = finalRow;
-
-            enrichedRows.push(finalRow);
-
-            rowTrace.update({
-              output: {
-                finalRow,
-                evaluation,
-                attemptCount: attempt,
-                optimization,
-              },
-            });
-
-            console.log(
-              `Row ${i + 1} completed with confidence scores:`,
-              Object.entries(evaluation)
-                .map(([col, resultGroups]) => {
-                  const bestScore = Math.max(
-                    ...resultGroups.map((group) => group.confidence),
-                  );
-                  return `${col}: ${bestScore}`;
-                })
-                .join(", "),
-            );
-            break;
-          } else {
-            // Optimization needed - use search query recommendations
-            console.log(
-              `Row ${i + 1} needs optimization. Low confidence columns:`,
-              optimization.lowConfidenceColumns,
-            );
-
-            // Use all available recommendations for the next attempt
-            searchQueryRecommendations = Object.values(
-              optimization.recommendations,
-            ).flat();
-
-            // Update current row with the best results found so far
-            currentRow = { ...currentRow, ...optimization.bestResults };
-
-            if (attempt < maxAttempts) {
-              console.log(
-                `Retrying with search queries: ${searchQueryRecommendations.join(", ")}`,
-              );
-            }
-          }
-        }
+        rowTrace.update({
+          output: {
+            enrichedRow: agentResult.enrichedRow,
+            cycles: agentResult.cycles,
+            success: agentResult.success,
+            usages: agentResult.usages,
+          },
+        });
       } catch (error) {
         console.error(`Error processing row ${i + 1}:`, error);
-        rowTrace.span({
-          level: "ERROR",
-          statusMessage:
-            error instanceof Error ? error.message : "Unknown error",
+        rowTrace.update({
           metadata: {
             langfuseTraceId: rowTrace.id,
           },
