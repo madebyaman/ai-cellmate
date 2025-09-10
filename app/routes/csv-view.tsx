@@ -1,11 +1,5 @@
 import { useState } from "react";
-import {
-  Search,
-  Filter,
-  SortAsc,
-  MoreHorizontal,
-  ExternalLink,
-} from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import {
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
@@ -28,6 +22,14 @@ interface CSVRow {
   domain: string;
   company: string;
   url: string;
+  industry: string;
+  employees: string;
+  founded: string;
+  location: string;
+  revenue: string;
+  description: string;
+  funding: string;
+  ceo: string;
   enriched?: boolean;
 }
 
@@ -38,6 +40,14 @@ const mockData: CSVRow[] = [
     domain: "servicebell.com",
     company: "ServiceBell",
     url: "https://www.linkedin.com/...",
+    industry: "Software",
+    employees: "10-50",
+    founded: "2019",
+    location: "San Francisco, CA",
+    revenue: "$1M-5M",
+    description: "Customer communication platform",
+    funding: "Series A",
+    ceo: "Sarah Chen",
     enriched: true,
   },
   {
@@ -45,6 +55,14 @@ const mockData: CSVRow[] = [
     domain: "baseten.co",
     company: "Baseten",
     url: "https://www.linkedin.com/...",
+    industry: "ML Infrastructure",
+    employees: "50-100",
+    founded: "2019",
+    location: "San Francisco, CA",
+    revenue: "$5M-10M",
+    description: "ML model deployment platform",
+    funding: "Series B",
+    ceo: "Tuhin Srivastava",
     enriched: true,
   },
   {
@@ -52,6 +70,14 @@ const mockData: CSVRow[] = [
     domain: "superhuman.com",
     company: "Superhuman",
     url: "https://www.linkedin.com/...",
+    industry: "Productivity",
+    employees: "100-250",
+    founded: "2015",
+    location: "San Francisco, CA",
+    revenue: "$10M-25M",
+    description: "Fastest email experience ever made",
+    funding: "Series C",
+    ceo: "Rahul Vohra",
     enriched: true,
   },
   {
@@ -59,6 +85,14 @@ const mockData: CSVRow[] = [
     domain: "donut.com",
     company: "Donut",
     url: "https://www.linkedin.com/...",
+    industry: "HR Tech",
+    employees: "25-50",
+    founded: "2016",
+    location: "New York, NY",
+    revenue: "$1M-5M",
+    description: "Team building and culture platform",
+    funding: "Seed",
+    ceo: "Dan Manian",
     enriched: true,
   },
   {
@@ -66,6 +100,14 @@ const mockData: CSVRow[] = [
     domain: "startengine.com",
     company: "StartEngine",
     url: "https://www.linkedin.com/...",
+    industry: "Fintech",
+    employees: "250-500",
+    founded: "2011",
+    location: "Los Angeles, CA",
+    revenue: "$25M-50M",
+    description: "Equity crowdfunding platform",
+    funding: "Series D",
+    ceo: "Howard Marks",
     enriched: true,
   },
   {
@@ -73,6 +115,14 @@ const mockData: CSVRow[] = [
     domain: "kandji.io",
     company: "Kandji",
     url: "https://www.linkedin.com/...",
+    industry: "Cybersecurity",
+    employees: "100-250",
+    founded: "2018",
+    location: "San Diego, CA",
+    revenue: "$10M-25M",
+    description: "Apple device management platform",
+    funding: "Series B",
+    ceo: "Adam Pettit",
     enriched: true,
   },
   {
@@ -80,6 +130,14 @@ const mockData: CSVRow[] = [
     domain: "mutinyhq.com",
     company: "Mutiny",
     url: "https://www.linkedin.com/...",
+    industry: "Marketing Tech",
+    employees: "50-100",
+    founded: "2018",
+    location: "San Francisco, CA",
+    revenue: "$5M-10M",
+    description: "Website personalization platform",
+    funding: "Series A",
+    ceo: "Nikhil Sethi",
     enriched: true,
   },
   {
@@ -87,6 +145,14 @@ const mockData: CSVRow[] = [
     domain: "joinpogo.com",
     company: "Pogo",
     url: "https://www.linkedin.com/...",
+    industry: "Gaming",
+    employees: "10-25",
+    founded: "2020",
+    location: "Remote",
+    revenue: "$500K-1M",
+    description: "Mobile game development",
+    funding: "Pre-Seed",
+    ceo: "Alex Kim",
     enriched: true,
   },
   {
@@ -94,6 +160,14 @@ const mockData: CSVRow[] = [
     domain: "kalshi.com",
     company: "Kalshi",
     url: "https://www.linkedin.com/...",
+    industry: "Fintech",
+    employees: "25-50",
+    founded: "2018",
+    location: "New York, NY",
+    revenue: "$1M-5M",
+    description: "Event trading platform",
+    funding: "Series A",
+    ceo: "Tarek Mansour",
     enriched: true,
   },
   {
@@ -101,6 +175,14 @@ const mockData: CSVRow[] = [
     domain: "aha.io",
     company: "Aha!",
     url: "https://www.linkedin.com/...",
+    industry: "Software",
+    employees: "100-250",
+    founded: "2013",
+    location: "Menlo Park, CA",
+    revenue: "$25M-50M",
+    description: "Product roadmap software",
+    funding: "Bootstrapped",
+    ceo: "Brian de Haaff",
     enriched: true,
   },
   {
@@ -108,6 +190,14 @@ const mockData: CSVRow[] = [
     domain: "vitally.io",
     company: "Vitally.io",
     url: "https://www.linkedin.com/...",
+    industry: "Customer Success",
+    employees: "25-50",
+    founded: "2017",
+    location: "New York, NY",
+    revenue: "$1M-5M",
+    description: "Customer success platform",
+    funding: "Series A",
+    ceo: "Jamie Davidson",
     enriched: true,
   },
 ];
@@ -152,16 +242,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function CSVView() {
   const { csvData } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
-  const [tableOn, setTableOn] = useState(true);
-  const [selectedRows, setSelectedRows] = useState<number[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [showAIModal, setShowAIModal] = useState(false);
-
-  const filteredData = csvData.filter(
-    (row) =>
-      row.domain.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      row.company.toLowerCase().includes(searchTerm.toLowerCase()),
-  );
 
   const handleEnrichData = (e) => {
     e.preventDefault();
@@ -169,207 +250,129 @@ export default function CSVView() {
     setShowAIModal(true);
   };
 
-  const toggleRowSelection = (id: number) => {
-    setSelectedRows((prev) =>
-      prev.includes(id) ? prev.filter((rowId) => rowId !== id) : [...prev, id],
-    );
-  };
-
   return (
     <LayoutWrapper>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <h1 className="text-2xl font-semibold text-gray-900">
-              🏺 Clay Starter Table
-            </h1>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">Table On</span>
-              <button
-                onClick={() => setTableOn(!tableOn)}
-                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  tableOn ? "bg-green-500" : "bg-gray-200"
-                }`}
-              >
-                <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                    tableOn ? "translate-x-6" : "translate-x-1"
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm">
-              <Search className="h-4 w-4" />
-              Find People
-            </Button>
-            <Button
-              onClick={handleEnrichData}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              {fetcher.state !== "idle" ? "Enriching..." : "Enrich Data"}
-            </Button>
-          </div>
+      <div className="h-screen flex flex-col">
+        {/* Simple Header */}
+        <div className="flex items-center justify-between p-4 border-b border-gray-200">
+          <h1 className="text-lg font-medium text-gray-900">
+            Clay Starter Table
+          </h1>
+          <Button
+            onClick={handleEnrichData}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            {fetcher.state !== "idle" ? "Enriching..." : "Enrich Data"}
+          </Button>
         </div>
 
-        {/* Search and Controls */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-gray-600">Default View</span>
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-gray-600">🔓 2 hidden</span>
-              <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-                <Filter className="h-4 w-4" />
-                Filter
-              </button>
-              <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-                <SortAsc className="h-4 w-4" />
-                Sort
-              </button>
-              <button className="flex items-center gap-1 text-sm text-gray-600 hover:text-gray-900">
-                <MoreHorizontal className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
-        </div>
-
-        {/* Table */}
-        <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="w-12 px-6 py-3">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 text-blue-600 rounded border-gray-300"
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedRows(filteredData.map((row) => row.id));
-                        } else {
-                          setSelectedRows([]);
-                        }
-                      }}
-                    />
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Domain
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    🏢 Enrich Company
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Url
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    + New Column
-                  </th>
+        {/* Table Container with overflow */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full border-collapse">
+            <thead className="sticky top-0 bg-white">
+              <tr>
+                <th className="px-3 py-2 text-sm font-medium text-gray-600 min-w-[40px]"></th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
+                  Domain
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
+                  Company
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[200px]">
+                  URL
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
+                  Industry
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[80px]">
+                  Employees
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[70px]">
+                  Founded
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
+                  Location
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
+                  Revenue
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[200px]">
+                  Description
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
+                  Funding
+                </th>
+                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
+                  CEO
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {csvData.map((row, index) => (
+                <tr key={row.id} className="">
+                  <td className="border-t border-gray-200 px-2 py-2 text-sm text-gray-600 text-center">
+                    {index + 1}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-gray-900">
+                    {row.domain}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-gray-900">
+                    {row.company}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-blue-600 hover:text-blue-800">
+                    <a
+                      href={row.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="hover:underline"
+                    >
+                      {row.url}
+                    </a>
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.industry}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.employees}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.founded}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.location}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.revenue}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.description}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.funding}
+                  </td>
+                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
+                    {row.ceo}
+                  </td>
                 </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredData.map((row, index) => (
-                  <tr key={row.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <input
-                        type="checkbox"
-                        className="h-4 w-4 text-blue-600 rounded border-gray-300"
-                        checked={selectedRows.includes(row.id)}
-                        onChange={() => toggleRowSelection(row.id)}
-                      />
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {row.domain}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <div className="h-6 w-6 bg-gray-100 rounded flex items-center justify-center text-xs">
-                          {getCompanyIcon(row.company)}
-                        </div>
-                        <span className="text-sm text-gray-900">
-                          {row.company}
-                        </span>
-                        {row.enriched && (
-                          <button className="text-blue-600 hover:text-blue-800">
-                            <ExternalLink className="h-3 w-3" />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1">
-                        <ExternalLink className="h-3 w-3 text-gray-400" />
-                        <span className="text-sm text-blue-600 hover:text-blue-800 cursor-pointer">
-                          {row.url}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-500">
-                      {/* Action buttons can go here */}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+              ))}
+            </tbody>
+          </table>
+        </div>
 
-          {/* Footer */}
-          <div className="bg-gray-50 px-6 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <button className="text-sm text-gray-600 hover:text-gray-900">
-                + New row
-              </button>
-              <button className="text-sm text-gray-600 hover:text-gray-900">
-                📊 Add data
-              </button>
-              <button className="text-sm text-gray-600 hover:text-gray-900">
-                🔍 Find Company Lookalikes
-              </button>
-            </div>
-            <div className="text-sm text-gray-600">
-              {filteredData.length} rows, {selectedRows.length} Selected
-            </div>
-          </div>
+        {/* Simple Bottom Row */}
+        <div className="p-2 border-t border-gray-200 bg-white">
+          <button className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
+            + Add new row
+          </button>
         </div>
       </div>
 
       <AIEnrichmentModal
         isOpen={showAIModal}
         onClose={() => setShowAIModal(false)}
-        selectedRows={selectedRows}
-        totalRows={filteredData.length}
+        selectedRows={[]}
+        totalRows={csvData.length}
       />
     </LayoutWrapper>
   );
-}
-
-// Helper function to get company icon
-function getCompanyIcon(company: string): string {
-  const icons: Record<string, string> = {
-    ServiceBell: "🔔",
-    Baseten: "🌱",
-    Superhuman: "⚡",
-    Donut: "🍩",
-    StartEngine: "🚀",
-    Kandji: "🔒",
-    Mutiny: "🎯",
-    Pogo: "🏓",
-    Kalshi: "📈",
-    "Aha!": "💡",
-    "Vitally.io": "❤️",
-  };
-  return icons[company] || "🏢";
 }
