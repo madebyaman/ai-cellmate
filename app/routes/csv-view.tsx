@@ -252,7 +252,7 @@ export default function CSVView() {
 
   return (
     <LayoutWrapper>
-      <div className="h-screen flex flex-col">
+      <div className="flex flex-col">
         {/* Simple Header */}
         <div className="flex items-center justify-between p-4 border-b border-gray-200">
           <h1 className="text-lg font-medium text-gray-900">

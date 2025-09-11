@@ -1,32 +1,33 @@
 import { Plus } from "lucide-react";
 import {
-  type LoaderFunctionArgs,
-  type ActionFunctionArgs,
   data,
+  UNSAFE_invariant,
   useFetcher,
+  useLoaderData,
+  type ActionFunctionArgs,
+  type LoaderFunctionArgs,
 } from "react-router";
+import { format } from "date-fns";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
-import { prisma } from "~/lib/prisma.server";
 import {
   getActiveOrganizationId,
   validateSubscriptionAndCredits,
-  type SubscriptionError,
 } from "~/utils/auth.server";
-import { redirectWithToast } from "~/utils/toast.server";
 import { ROUTES } from "~/utils/constants";
+import { redirectWithToast } from "~/utils/toast.server";
+import {
+  getTablesForOrganization,
+  type TableWithLatestRun,
+} from "~/lib/table.server";
 // import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
-export async function loader({ request, params }: LoaderFunctionArgs) {
-  // const slug = params.slug as string;
-  const id = await getActiveOrganizationId(request);
-  const org = await prisma.organization.findUnique({
-    where: { id },
-  });
-  console.log("org", org);
-  // const organization = await verifyUserAccessToOrganization(request, slug);
-  // return { organization };
-  return null;
+export async function loader({ request }: LoaderFunctionArgs) {
+  const orgId = await getActiveOrganizationId(request);
+  UNSAFE_invariant(orgId, "No active org");
+  const tables = await getTablesForOrganization(orgId);
+
+  return data({ tables });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -35,6 +36,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === "add-new-data") {
     const orgId = await getActiveOrganizationId(request);
+    UNSAFE_invariant(orgId, "No organization id found while adding new data");
 
     // Server-side validation - check if user has subscription and at least 10 credits
     const validation = await validateSubscriptionAndCredits(request, orgId, 10);
@@ -58,6 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Dashboard() {
+  const { tables } = useLoaderData<{ tables: TableWithLatestRun[] }>();
   const fetcher = useFetcher();
 
   const handleAddNewData = () => {
@@ -65,6 +68,49 @@ export default function Dashboard() {
     formData.append("intent", "add-new-data");
     fetcher.submit(formData, { method: "POST" });
   };
+
+  const formatDate = (date: string) => {
+    return format(new Date(date), "MMM d, yyyy");
+  };
+
+  const getStatus = (table: TableWithLatestRun) => {
+    if (!table.Run || table.Run.length === 0) {
+      return "No runs";
+    }
+    return table.Run[0].status;
+  };
+
+  if (tables.length === 0) {
+    return (
+      <LayoutWrapper>
+        <div className="flex justify-between">
+          <h1 className="text-3xl font-bold tracking-tight text-gray-900">
+            My Data
+          </h1>
+        </div>
+        <div className="mt-8">
+          <div className="rounded-lg border border-gray-200 bg-white p-8">
+            <h3 className="font-medium text-gray-900 mb-2">
+              Get started by uploading your first CSV to enrich with AI
+            </h3>
+            <p className="text-gray-500 text-sm mb-4">
+              Upload your CSV and our AI agents get to work immediately. Watch
+              as missing data gets filled in row by row, completely hands-free
+            </p>
+            <Button
+              variant="default"
+              onClick={handleAddNewData}
+              disabled={fetcher.state !== "idle"}
+              className="gap-1 px-3 py-1.5"
+            >
+              <Plus className="size-4" />
+              {fetcher.state !== "idle" ? "Processing..." : "Add New Data"}
+            </Button>
+          </div>
+        </div>
+      </LayoutWrapper>
+    );
+  }
 
   return (
     <LayoutWrapper>
@@ -99,49 +145,61 @@ export default function Dashboard() {
                       scope="col"
                       className="py-3.5 pr-3 pl-4 text-left text-xs tracking-wide font-normal uppercase text-gray-500 sm:pl-6"
                     >
-                      Title
+                      Created At
                     </th>
                     <th
                       scope="col"
                       className="py-3.5 pr-3 pl-4 text-left text-xs tracking-wide font-normal uppercase text-gray-500 sm:pl-6"
                     >
-                      Email
+                      Created By
                     </th>
                     <th
                       scope="col"
                       className="py-3.5 pr-3 pl-4 text-left text-xs tracking-wide font-normal uppercase text-gray-500 sm:pl-6"
                     >
-                      Role
+                      Status
                     </th>
                     <th
                       scope="col"
                       className="py-3.5 pr-3 pl-4 text-left text-xs tracking-wide font-normal uppercase text-gray-500 sm:pl-6"
                     >
-                      <span className="sr-only">Edit</span>
+                      <span className="sr-only">Actions</span>
                     </th>
                   </tr>
                 </thead>
                 <tbody className="divide-gray-100 divide-y-2 bg-white">
-                  {people.map((person) => (
-                    <tr key={person.email}>
+                  {tables.map((table) => (
+                    <tr key={table.id}>
                       <td className="py-4 pr-3 pl-4 text-sm font-medium whitespace-nowrap text-gray-900 sm:pl-6">
-                        {person.name}
+                        {table.name}
                       </td>
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-gray-500">
-                        {person.title}
+                        {formatDate(table.createdAt)}
                       </td>
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-gray-500">
-                        {person.email}
+                        {table.createdBy || "Unknown"}
                       </td>
                       <td className="px-3 py-4 text-sm whitespace-nowrap text-gray-500">
-                        {person.role}
+                        <span
+                          className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                            getStatus(table) === "COMPLETED"
+                              ? "bg-green-100 text-green-800"
+                              : getStatus(table) === "RUNNING"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : getStatus(table) === "FAILED"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                          }`}
+                        >
+                          {getStatus(table)}
+                        </span>
                       </td>
                       <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                         <a
-                          href="#"
+                          href={`/tables/${table.id}`}
                           className="text-indigo-600 hover:text-indigo-900"
                         >
-                          Edit<span className="sr-only">, {person.name}</span>
+                          View<span className="sr-only">, {table.name}</span>
                         </a>
                       </td>
                     </tr>
@@ -151,66 +209,7 @@ export default function Dashboard() {
             </div>
           </div>
         </div>
-        <nav
-          aria-label="Pagination"
-          className="flex items-center justify-between w-full px-4 py-3 sm:px-6"
-        >
-          <div className="hidden sm:block">
-            <p className="text-sm text-gray-700">
-              Showing <span className="font-medium">1</span> to{" "}
-              <span className="font-medium">10</span> of{" "}
-              <span className="font-medium">20</span> results
-            </p>
-          </div>
-          <div className="flex flex-1 justify-between sm:justify-end">
-            <a
-              href="#"
-              className="relative inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus-visible:outline-offset-0"
-            >
-              Previous
-            </a>
-            <a
-              href="#"
-              className="relative ml-3 inline-flex items-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 ring-1 ring-gray-300 ring-inset hover:bg-gray-50 focus-visible:outline-offset-0"
-            >
-              Next
-            </a>
-          </div>
-        </nav>
       </div>
     </LayoutWrapper>
   );
 }
-
-const people = [
-  {
-    name: "Lindsay Walton",
-    title: "Front-end Developer",
-    email: "lindsay.walton@example.com",
-    role: "Member",
-  },
-  {
-    name: "Courtney Henry",
-    title: "Designer",
-    email: "courtney.henry@example.com",
-    role: "Admin",
-  },
-  {
-    name: "Tom Cook",
-    title: "Full-stack Developer",
-    email: "tom.cook@example.com",
-    role: "Member",
-  },
-  {
-    name: "Whitney Francis",
-    title: "Product Manager",
-    email: "whitney.francis@example.com",
-    role: "Owner",
-  },
-  {
-    name: "Michael Foster",
-    title: "Marketing Specialist",
-    email: "michael.foster@example.com",
-    role: "Member",
-  },
-];

@@ -20,7 +20,6 @@ export default [
   route("create-workspace", "routes/create-organization.tsx"),
   route("billing", "./routes/billing.tsx"),
   route("logout", "routes/logout.ts"),
-  route("csv-view", "routes/csv-view.tsx"),
 
   // Redirect route for /app
   // route("app", "routes/middleware.tsx"),
@@ -28,6 +27,7 @@ export default [
   // Protected routes with middleware checks
   route("app", "./routes/layout.tsx", [
     index("./routes/dashboard.tsx"),
+    route("csv-view", "routes/csv-view.tsx"),
     route("settings", "./routes/settings.tsx", [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),

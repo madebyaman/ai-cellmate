@@ -20,6 +20,7 @@ import { HoneypotProvider } from "remix-utils/honeypot/react";
 import { AuthenticityTokenProvider } from "remix-utils/csrf/react";
 import { Toaster } from "sonner";
 import { useToast } from "./components/use-toast";
+import { GlobalLoading } from "./components/global-loading";
 
 export const links: Route.LinksFunction = () => [
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -70,6 +71,7 @@ function Layout({
         <Links />
       </head>
       <body className="h-full">
+        <GlobalLoading />
         {children}
         <Toaster richColors closeButton position="top-center" />
         <script
@@ -124,7 +126,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
 
   return (
     <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
+      <h1>Error: {message}</h1>
       <p>{details}</p>
       {stack && (
         <pre className="w-full p-4 overflow-x-auto">
