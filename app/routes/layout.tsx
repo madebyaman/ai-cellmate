@@ -139,7 +139,7 @@ export default function Layout() {
     useLoaderData<typeof loader>();
 
   return (
-    <div className="min-h-full flex flex-col">
+    <div className="h-full flex flex-col">
       <nav className="border-b border-gray-200 bg-white sticky top-0">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
@@ -292,9 +292,7 @@ export default function Layout() {
         hasValidSubscription={!!subscription}
       />
 
-      <div className="py-10 bg-gray-50 flex-1">
-        <Outlet />
-      </div>
+      <Outlet />
     </div>
   );
 }

@@ -70,7 +70,7 @@ function Layout({
         <Meta />
         <Links />
       </head>
-      <body className="h-full">
+      <body className="h-full overflow-x-hidden">
         <GlobalLoading />
         {children}
         <Toaster richColors closeButton position="top-center" />

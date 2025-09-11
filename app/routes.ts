@@ -4,7 +4,6 @@ import {
   layout,
   route,
 } from "@react-router/dev/routes";
-import { ROUTES } from "./utils/constants";
 
 export default [
   // Public routes (no auth required)
