@@ -1,6 +1,7 @@
 import { Calendar, Plus } from "lucide-react";
 import type { ActionFunctionArgs } from "react-router";
 import { Form, redirect, UNSAFE_invariant, useNavigation } from "react-router";
+import { format } from "date-fns";
 import { prisma } from "~/lib/prisma.server";
 import {
   createBillingPortalSession,
@@ -177,14 +178,14 @@ export default function BillingSection() {
                 <>
                   Cancels on{" "}
                   {subscription?.periodEnd
-                    ? new Date(subscription.periodEnd).toLocaleDateString()
+                    ? format(new Date(subscription.periodEnd), "MMM d, yyyy")
                     : "N/A"}
                 </>
               ) : (
                 <>
                   Renews on{" "}
                   {subscription?.periodEnd
-                    ? new Date(subscription.periodEnd).toLocaleDateString()
+                    ? format(new Date(subscription.periodEnd), "MMM d, yyyy")
                     : "N/A"}
                 </>
               )}
