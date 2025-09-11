@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ExternalLink } from "lucide-react";
+import { ExternalLink, Download, Clock, CheckCircle, AlertCircle, Info } from "lucide-react";
 import {
   type LoaderFunctionArgs,
   type ActionFunctionArgs,
@@ -16,191 +16,7 @@ import {
 } from "~/utils/auth.server";
 import { redirectWithToast } from "~/utils/toast.server";
 import { ROUTES } from "~/utils/constants";
-
-interface CSVRow {
-  id: number;
-  domain: string;
-  company: string;
-  url: string;
-  industry: string;
-  employees: string;
-  founded: string;
-  location: string;
-  revenue: string;
-  description: string;
-  funding: string;
-  ceo: string;
-  enriched?: boolean;
-}
-
-// Mock data that matches the screenshot
-const mockData: CSVRow[] = [
-  {
-    id: 1,
-    domain: "servicebell.com",
-    company: "ServiceBell",
-    url: "https://www.linkedin.com/...",
-    industry: "Software",
-    employees: "10-50",
-    founded: "2019",
-    location: "San Francisco, CA",
-    revenue: "$1M-5M",
-    description: "Customer communication platform",
-    funding: "Series A",
-    ceo: "Sarah Chen",
-    enriched: true,
-  },
-  {
-    id: 2,
-    domain: "baseten.co",
-    company: "Baseten",
-    url: "https://www.linkedin.com/...",
-    industry: "ML Infrastructure",
-    employees: "50-100",
-    founded: "2019",
-    location: "San Francisco, CA",
-    revenue: "$5M-10M",
-    description: "ML model deployment platform",
-    funding: "Series B",
-    ceo: "Tuhin Srivastava",
-    enriched: true,
-  },
-  {
-    id: 3,
-    domain: "superhuman.com",
-    company: "Superhuman",
-    url: "https://www.linkedin.com/...",
-    industry: "Productivity",
-    employees: "100-250",
-    founded: "2015",
-    location: "San Francisco, CA",
-    revenue: "$10M-25M",
-    description: "Fastest email experience ever made",
-    funding: "Series C",
-    ceo: "Rahul Vohra",
-    enriched: true,
-  },
-  {
-    id: 4,
-    domain: "donut.com",
-    company: "Donut",
-    url: "https://www.linkedin.com/...",
-    industry: "HR Tech",
-    employees: "25-50",
-    founded: "2016",
-    location: "New York, NY",
-    revenue: "$1M-5M",
-    description: "Team building and culture platform",
-    funding: "Seed",
-    ceo: "Dan Manian",
-    enriched: true,
-  },
-  {
-    id: 5,
-    domain: "startengine.com",
-    company: "StartEngine",
-    url: "https://www.linkedin.com/...",
-    industry: "Fintech",
-    employees: "250-500",
-    founded: "2011",
-    location: "Los Angeles, CA",
-    revenue: "$25M-50M",
-    description: "Equity crowdfunding platform",
-    funding: "Series D",
-    ceo: "Howard Marks",
-    enriched: true,
-  },
-  {
-    id: 6,
-    domain: "kandji.io",
-    company: "Kandji",
-    url: "https://www.linkedin.com/...",
-    industry: "Cybersecurity",
-    employees: "100-250",
-    founded: "2018",
-    location: "San Diego, CA",
-    revenue: "$10M-25M",
-    description: "Apple device management platform",
-    funding: "Series B",
-    ceo: "Adam Pettit",
-    enriched: true,
-  },
-  {
-    id: 7,
-    domain: "mutinyhq.com",
-    company: "Mutiny",
-    url: "https://www.linkedin.com/...",
-    industry: "Marketing Tech",
-    employees: "50-100",
-    founded: "2018",
-    location: "San Francisco, CA",
-    revenue: "$5M-10M",
-    description: "Website personalization platform",
-    funding: "Series A",
-    ceo: "Nikhil Sethi",
-    enriched: true,
-  },
-  {
-    id: 8,
-    domain: "joinpogo.com",
-    company: "Pogo",
-    url: "https://www.linkedin.com/...",
-    industry: "Gaming",
-    employees: "10-25",
-    founded: "2020",
-    location: "Remote",
-    revenue: "$500K-1M",
-    description: "Mobile game development",
-    funding: "Pre-Seed",
-    ceo: "Alex Kim",
-    enriched: true,
-  },
-  {
-    id: 9,
-    domain: "kalshi.com",
-    company: "Kalshi",
-    url: "https://www.linkedin.com/...",
-    industry: "Fintech",
-    employees: "25-50",
-    founded: "2018",
-    location: "New York, NY",
-    revenue: "$1M-5M",
-    description: "Event trading platform",
-    funding: "Series A",
-    ceo: "Tarek Mansour",
-    enriched: true,
-  },
-  {
-    id: 10,
-    domain: "aha.io",
-    company: "Aha!",
-    url: "https://www.linkedin.com/...",
-    industry: "Software",
-    employees: "100-250",
-    founded: "2013",
-    location: "Menlo Park, CA",
-    revenue: "$25M-50M",
-    description: "Product roadmap software",
-    funding: "Bootstrapped",
-    ceo: "Brian de Haaff",
-    enriched: true,
-  },
-  {
-    id: 11,
-    domain: "vitally.io",
-    company: "Vitally.io",
-    url: "https://www.linkedin.com/...",
-    industry: "Customer Success",
-    employees: "25-50",
-    founded: "2017",
-    location: "New York, NY",
-    revenue: "$1M-5M",
-    description: "Customer success platform",
-    funding: "Series A",
-    ceo: "Jamie Davidson",
-    enriched: true,
-  },
-];
+import { loadCSVData, type CSVRow } from "~/utils/csv-parser";
 
 export async function loader({ request }: LoaderFunctionArgs) {
   // const orgId = await getActiveOrganizationId(request);
@@ -209,8 +25,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // });
   const org = {};
 
-  // In a real implementation, you'd fetch CSV data from database
-  return data({ organization: org, csvData: mockData });
+  // Load CSV data from the new.csv file
+  const csvData = loadCSVData();
+  return data({ organization: org, csvData });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -243,6 +60,17 @@ export default function CSVView() {
   const { csvData } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const [showAIModal, setShowAIModal] = useState(false);
+  const [showDetails, setShowDetails] = useState(false);
+  
+  // Mock enrichment state - in real app this would come from loader/fetcher
+  const [enrichmentState, setEnrichmentState] = useState<'idle' | 'processing' | 'completed' | 'failed'>('completed');
+  const [enrichmentDetails] = useState({
+    prompt: "Find social media profiles and professional websites for each person",
+    websitesScraped: ["linkedin.com", "twitter.com", "github.io", "company-sites"],
+    processedRows: csvData.length,
+    totalRows: csvData.length,
+    completedAt: new Date()
+  });
 
   const handleEnrichData = (e) => {
     e.preventDefault();
@@ -251,120 +79,170 @@ export default function CSVView() {
   };
 
   return (
-    <LayoutWrapper>
-      <div className="flex flex-col">
-        {/* Simple Header */}
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <h1 className="text-lg font-medium text-gray-900">
-            Clay Starter Table
-          </h1>
+    <LayoutWrapper
+      className="flex flex-col h-full overflow-auto"
+      outerContainerClass="overflow-auto"
+    >
+      {/* Header - Supabase style but light */}
+      <div className="flex items-center justify-between py-4 flex-shrink-0">
+        <div className="flex items-center gap-4">
+          <h1 className="text-lg font-semibold text-gray-900">People CSV Data</h1>
+          
+          {/* Processing State Indicator */}
+          {enrichmentState === 'processing' && (
+            <div className="flex items-center gap-2 text-amber-600">
+              <Clock className="w-4 h-4 animate-spin" />
+              <span className="text-sm">Processing {enrichmentDetails.processedRows}/{enrichmentDetails.totalRows} rows</span>
+            </div>
+          )}
+          
+          {enrichmentState === 'completed' && (
+            <div className="flex items-center gap-2 text-green-600">
+              <CheckCircle className="w-4 h-4" />
+              <span className="text-sm">Enrichment completed</span>
+            </div>
+          )}
+          
+          {enrichmentState === 'failed' && (
+            <div className="flex items-center gap-2 text-red-600">
+              <AlertCircle className="w-4 h-4" />
+              <span className="text-sm">Enrichment failed</span>
+            </div>
+          )}
+        </div>
+        
+        <div className="flex items-center gap-3">
+          {/* View Details Button - show when enrichment has run */}
+          {enrichmentState !== 'idle' && (
+            <Button
+              variant="outline"
+              className="text-gray-700 border-gray-300 hover:bg-gray-50"
+            >
+              <Info className="w-4 h-4 mr-2" />
+              View Details
+            </Button>
+          )}
+          
+          {/* Export Button - only show when completed */}
+          {enrichmentState === 'completed' && (
+            <Button
+              variant="outline"
+              className="text-gray-700 border-gray-300 hover:bg-gray-50"
+            >
+              <Download className="w-4 h-4 mr-2" />
+              Export CSV
+            </Button>
+          )}
+          
           <Button
             onClick={handleEnrichData}
-            className="bg-blue-600 hover:bg-blue-700"
+            className="bg-green-600 hover:bg-green-700 text-white"
+            disabled={enrichmentState === 'processing'}
           >
-            {fetcher.state !== "idle" ? "Enriching..." : "Enrich Data"}
+            {enrichmentState === 'processing' ? "Processing..." : "Enrich Data"}
           </Button>
         </div>
+      </div>
 
-        {/* Table Container with overflow */}
-        <div className="flex-1 overflow-auto">
-          <table className="w-full border-collapse">
-            <thead className="sticky top-0 bg-white">
-              <tr>
-                <th className="px-3 py-2 text-sm font-medium text-gray-600 min-w-[40px]"></th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
-                  Domain
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
-                  Company
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[200px]">
-                  URL
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
-                  Industry
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[80px]">
-                  Employees
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[70px]">
-                  Founded
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
-                  Location
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
-                  Revenue
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[200px]">
-                  Description
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[100px]">
-                  Funding
-                </th>
-                <th className="border-l border-gray-200 px-3 py-2 text-sm font-normal text-gray-500 min-w-[120px]">
-                  CEO
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {csvData.map((row, index) => (
-                <tr key={row.id} className="">
-                  <td className="border-t border-gray-200 px-2 py-2 text-sm text-gray-600 text-center">
-                    {index + 1}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-gray-900">
-                    {row.domain}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-gray-900">
-                    {row.company}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-3 py-2 text-sm text-blue-600 hover:text-blue-800">
+      {/* Table Container - Supabase style */}
+      <div className="flex-1 overflow-auto ring-1 ring-gray-200 rounded sm:rounded-lg">
+        <table className="w-full border-collapse">
+          <thead className="sticky top-0 bg-white shadow-sm">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-16">
+                #
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200">
+                First Name
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200">
+                Last Name
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px] border-l border-gray-200">
+                Email
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[180px] border-l border-gray-200">
+                Website
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200">
+                Instagram
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200">
+                Facebook
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[120px] border-l border-gray-200">
+                X (Twitter)
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px] border-l border-gray-200">
+                Bio
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[150px] border-l border-gray-200">
+                Created At
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {csvData.map((row, index) => (
+              <tr
+                key={row.id}
+                className="hover:bg-gray-50 transition-colors duration-150"
+              >
+                <td className="px-4 py-3 text-sm text-gray-500 text-center font-mono">
+                  {index + 1}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.first_name}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.last_name}
+                </td>
+                <td className="px-4 py-3 text-sm border-l border-gray-200">
+                  <a
+                    href={`mailto:${row.email}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {row.email}
+                  </a>
+                </td>
+                <td className="px-4 py-3 text-sm border-l border-gray-200">
+                  {row.website ? (
                     <a
-                      href={row.url}
+                      href={row.website}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="hover:underline"
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      {row.url}
+                      {row.website}
                     </a>
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.industry}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.employees}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.founded}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.location}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.revenue}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.description}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.funding}
-                  </td>
-                  <td className="border-l border-t border-gray-200 px-2 py-2 text-sm text-gray-900">
-                    {row.ceo}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Simple Bottom Row */}
-        <div className="p-2 border-t border-gray-200 bg-white">
-          <button className="text-sm text-blue-600 hover:text-blue-800 hover:underline">
-            + Add new row
-          </button>
-        </div>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.instagram_id || <span className="text-gray-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.facebook_id || <span className="text-gray-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.x_id || <span className="text-gray-400">—</span>}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200">
+                  {row.bio ? (
+                    <div className="max-w-xs truncate" title={row.bio}>
+                      {row.bio}
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">—</span>
+                  )}
+                </td>
+                <td className="px-4 py-3 text-sm text-gray-900 border-l border-gray-200 font-mono">
+                  {new Date(row.created_at).toLocaleDateString()}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       <AIEnrichmentModal

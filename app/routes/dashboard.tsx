@@ -1,6 +1,7 @@
 import { Plus } from "lucide-react";
 import {
   data,
+  redirect,
   UNSAFE_invariant,
   useFetcher,
   useLoaderData,
@@ -12,6 +13,7 @@ import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import {
   getActiveOrganizationId,
+  requireActiveOrg,
   validateSubscriptionAndCredits,
 } from "~/utils/auth.server";
 import { ROUTES } from "~/utils/constants";
@@ -23,9 +25,8 @@ import {
 // import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const orgId = await getActiveOrganizationId(request);
-  UNSAFE_invariant(orgId, "No active org");
-  const tables = await getTablesForOrganization(orgId);
+  const { activeOrg } = await requireActiveOrg(request);
+  const tables = await getTablesForOrganization(activeOrg.id);
 
   return data({ tables });
 }
