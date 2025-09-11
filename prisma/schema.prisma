@@ -116,6 +116,7 @@ model Organization {
   credits          Credits?
   stripeCustomerId String?
   Subscription     Subscription[]
+  tables           Table[]
 
   @@unique([slug])
   @@map("organization")
@@ -150,17 +151,20 @@ model Invitation {
 // https://chatgpt.com/share/68a68c81-50c0-800f-94ce-f184b2c5c1f4
 
 model Table {
-  id        String   @id @default(cuid())
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  name      String
-  uploadKey String?
+  id             String   @id @default(cuid())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  name           String
+  uploadKey      String?
+  organizationId String
+  createdBy      String?
 
   // relations
-  rows    Row[]
-  columns Column[]
-  hint    Hint?
-  Run     Run[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  rows         Row[]
+  columns      Column[]
+  hint         Hint?
+  Run          Run[]
 
   @@map("table")
 }
@@ -277,14 +281,14 @@ model Run {
   updatedAt DateTime @updatedAt
 
   // relations
-  rowId        String?
-  row          Row?           @relation(fields: [rowId], references: [id])
-  columnId     String?
-  column       Column?        @relation(fields: [columnId], references: [id])
-  tableId      String?
-  table        Table?         @relation(fields: [tableId], references: [id])
-  cellId       String?
-  cell         Cell?          @relation(fields: [cellId], references: [id])
+  // rowId        String?
+  // row          Row?           @relation(fields: [rowId], references: [id])
+  // columnId     String?
+  // column       Column?        @relation(fields: [columnId], references: [id])
+  tableId      String
+  table        Table          @relation(fields: [tableId], references: [id])
+  // cellId       String?
+  // cell         Cell?          @relation(fields: [cellId], references: [id])
   // also need to keep track of all the cell versions a specific run yielded
   cellVersions CellVersions[]
 
@@ -294,6 +298,12 @@ model Run {
   error      String?
   startedAt  DateTime
   finishedAt DateTime
+  Row        Row?           @relation(fields: [rowId], references: [id])
+  rowId      String?
+  Column     Column?        @relation(fields: [columnId], references: [id])
+  columnId   String?
+  Cell       Cell?          @relation(fields: [cellId], references: [id])
+  cellId     String?
 }
 
 enum Status {
