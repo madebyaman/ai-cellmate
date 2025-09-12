@@ -1,11 +1,12 @@
 import { useState } from "react";
 import {
-  ExternalLink,
   Download,
   Clock,
   CheckCircle,
   AlertCircle,
   Info,
+  Dot,
+  Loader,
 } from "lucide-react";
 import {
   type LoaderFunctionArgs,
@@ -17,6 +18,7 @@ import {
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { AIEnrichmentModal } from "~/components/ai-enrichment-modal";
+import { CSVDetailsModal } from "~/components/csv-details-modal";
 import {
   getActiveOrganizationId,
   requireActiveOrg,
@@ -93,7 +95,7 @@ export default function CSVView() {
     }
   };
 
-  const [enrichmentState] = useState(getEnrichmentState());
+  const enrichmentState = getEnrichmentState();
 
   const getEnrichmentDetails = () => {
     const latestRun = cachedData.runs[0];
@@ -141,26 +143,12 @@ export default function CSVView() {
 
           {/* Processing State Indicator */}
           {enrichmentState === "processing" && (
-            <div className="flex items-center gap-2 text-amber-600">
-              <Clock className="w-4 h-4 animate-spin" />
+            <div className="flex items-center gap-2 text-yellow-600">
+              <Loader className="w-4 h-4 animate-spin" />
               <span className="text-sm">
                 Processing {enrichmentDetails.processedCells}/
                 {enrichmentDetails.totalCells} cells
               </span>
-            </div>
-          )}
-
-          {enrichmentState === "completed" && (
-            <div className="flex items-center gap-2 text-green-600">
-              <CheckCircle className="w-4 h-4" />
-              <span className="text-sm">Enrichment completed</span>
-            </div>
-          )}
-
-          {enrichmentState === "failed" && (
-            <div className="flex items-center gap-2 text-red-600">
-              <AlertCircle className="w-4 h-4" />
-              <span className="text-sm">Enrichment failed</span>
             </div>
           )}
         </div>
@@ -169,8 +157,9 @@ export default function CSVView() {
           <Button
             variant="outline"
             className="text-gray-700 border-gray-300 hover:bg-gray-50"
+            onClick={() => setShowDetails(true)}
           >
-            <Info className="w-4 h-4 mr-2" />
+            <Info className="w-4 h-4" />
             View Details
           </Button>
 
@@ -180,13 +169,13 @@ export default function CSVView() {
               variant="outline"
               className="text-gray-700 border-gray-300 hover:bg-gray-50"
             >
-              <Download className="w-4 h-4 mr-2" />
+              <Download className="w-4 h-4" />
               Export CSV
             </Button>
           )}
 
           <Button
-            onClick={handleEnrichData}
+            onClick={(e) => setShowAIModal(true)}
             className="bg-green-600 hover:bg-green-700 text-white"
             disabled={enrichmentState === "processing"}
           >
@@ -289,6 +278,17 @@ export default function CSVView() {
         onClose={() => setShowAIModal(false)}
         selectedRows={[]}
         totalRows={cachedData.rows.length}
+      />
+
+      <CSVDetailsModal
+        isOpen={showDetails}
+        onClose={() => setShowDetails(false)}
+        tableName={cachedData.name}
+        runs={cachedData.runs || []}
+        hint={cachedData.hint}
+        processedCells={enrichmentDetails.processedCells}
+        totalCells={enrichmentDetails.totalCells}
+        status={status}
       />
     </LayoutWrapper>
   );

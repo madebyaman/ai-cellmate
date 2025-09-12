@@ -70,7 +70,7 @@ export default function Dashboard() {
     fetcher.submit(formData, { method: "POST" });
   };
 
-  const formatDate = (date: string) => {
+  const formatDate = (date: string | Date) => {
     return format(new Date(date), "MMM d, yyyy");
   };
 
