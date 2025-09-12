@@ -439,10 +439,7 @@ function FeedbackButton() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          className="m-1 text-gray-500 border-transparent hover:border-gray-300 text-sm"
-        >
+        <Button variant="outline" className="m-1">
           Leave Feedback
         </Button>
       </PopoverTrigger>

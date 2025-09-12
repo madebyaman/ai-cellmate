@@ -8,7 +8,7 @@ const getVariantClasses = (variant: string = "default") => {
     default:
       "bg-gradient-to-br from-primary-600 to-primary-700 text-white ring-primary-400",
     destructive: "bg-red-50 text-red-600 hover:bg-red-100 ring-red-400",
-    outline: "border border-slate-300 bg-white hover:bg-slate-50 ring-gray-400",
+    outline: "border border-slate-300 bg-white hover:bg-slate-50 shadow-none",
     secondary:
       "bg-gradient-to-br from-gray-800 to-gray-900 text-white ring-gray-400",
     ghost: "hover:bg-primary-600 border-none shadow-none",
@@ -60,7 +60,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseClasses =
-      "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium shadow-sm transition-all duration-200 hover:shadow outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 ring-offset-1 disabled:pointer-events-none disabled:opacity-50 cursor-pointer";
+      "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium shadow-sm transition-all duration-200 hover:shadow outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 disabled:pointer-events-none disabled:opacity-50 cursor-pointer";
 
     const classes = cn(
       baseClasses,
@@ -72,11 +72,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     // If 'to' prop is provided or variant is 'link', render as Link
     if (to || variant === "link") {
       return (
-        <Link
-          to={to || "#"}
-          className={classes}
-          {...(props as any)}
-        >
+        <Link to={to || "#"} className={classes} {...(props as any)}>
           {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
         </Link>
       );
