@@ -164,7 +164,8 @@ model Table {
   rows         Row[]
   columns      Column[]
   hint         Hint?
-  Run          Run[]
+  runs         Run[]
+  cachedTable  CachedTable?
 
   @@map("table")
 }
@@ -179,7 +180,7 @@ model Row {
   position  Int
   cells     Cell[]
   hint      Hint?
-  Run       Run[]
+  // Run       Run[]
 
   @@unique([tableId, position])
   @@map("row")
@@ -195,7 +196,7 @@ model Column {
   position  Int
   cells     Cell[]
   hint      Hint?
-  Run       Run[]
+  // Run       Run[]
 
   @@unique([tableId, position])
   @@map("column")
@@ -212,7 +213,7 @@ model Cell {
   column       Column         @relation(fields: [columnId], references: [id])
   cellVersions CellVersions[]
   hint         Hint?
-  Run          Run[]
+  // Run          Run[]
 
   @@unique([rowId, columnId])
   @@map("cell")
@@ -293,17 +294,17 @@ model Run {
   cellVersions CellVersions[]
 
   // values
-  scope      HintOrRunScope
-  status     Status         @default(PENDING)
+  // scope      HintOrRunScope
+  status     Status    @default(PENDING)
   error      String?
-  startedAt  DateTime
-  finishedAt DateTime
-  Row        Row?           @relation(fields: [rowId], references: [id])
-  rowId      String?
-  Column     Column?        @relation(fields: [columnId], references: [id])
-  columnId   String?
-  Cell       Cell?          @relation(fields: [cellId], references: [id])
-  cellId     String?
+  startedAt  DateTime?
+  finishedAt DateTime?
+  // Row        Row?           @relation(fields: [rowId], references: [id])
+  // rowId      String?
+  // Column     Column?        @relation(fields: [columnId], references: [id])
+  // columnId   String?
+  // Cell       Cell?          @relation(fields: [cellId], references: [id])
+  // cellId     String?
 }
 
 enum Status {
@@ -311,4 +312,17 @@ enum Status {
   RUNNING
   COMPLETED
   FAILED
+}
+
+model CachedTable {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tableId   String   @unique
+  table     Table    @relation(fields: [tableId], references: [id], onDelete: Cascade)
+
+  // JSON data containing all table structure and content
+  data Json
+
+  @@map("cached_table")
 }
