@@ -27,6 +27,14 @@
     cubic-bezier(0.16, 1, 0.3, 1);
   --animate-slide-right-and-fade: slideRightAndFade 400ms
     cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-right: slideRight 400ms ease-in-out;
+  --animate-slide-out-right: slideOutRight 200ms ease-in-out;
+  --animate-overlay-show: overlayShow 400ms ease-in-out;
+
+  @keyframes overlayShow {
+	from: { opacity: "0" },
+	to: { opacity: "1" },
+  }
 
   @keyframes fade {
     0% {
@@ -77,6 +85,23 @@
     to {
       opacity: 1;
       transform: translateX(0);
+    }
+  }
+
+  @keyframes slideRight {
+    from {
+      transform: translateX(100%);
+    }
+    to {
+      transform: translateX(0);
+    }
+  }
+  @keyframes slideOutRight {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(100%);
     }
   }
 }

@@ -11,7 +11,8 @@ const getVariantClasses = (variant: string = "default") => {
     outline: "border border-slate-300 bg-white hover:bg-slate-50 shadow-none",
     secondary:
       "bg-gradient-to-br from-gray-800 to-gray-900 text-white ring-gray-400",
-    ghost: "hover:bg-primary-600 border-none shadow-none",
+    ghost:
+      "hover:bg-primary-300/30 border-none shadow-none hover:shadow-none text-primary-700",
     link: "text-primary-600 hover:text-gray-800 hover:no-underline border-none shadow-none hover:shadow-none",
     icon: "border rounded-full border-slate-300 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300",
   };
