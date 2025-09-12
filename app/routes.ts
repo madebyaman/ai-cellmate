@@ -26,7 +26,7 @@ export default [
   // Protected routes with middleware checks
   route("app", "./routes/layout.tsx", [
     index("./routes/dashboard.tsx"),
-    route("csv-view", "routes/csv-view.tsx"),
+    route("/app/:tableId", "routes/csv-view.tsx"),
     route("settings", "./routes/settings.tsx", [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),

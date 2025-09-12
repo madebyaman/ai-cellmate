@@ -75,10 +75,10 @@ export default function Dashboard() {
   };
 
   const getStatus = (table: TableWithLatestRun) => {
-    if (!table.Run || table.Run.length === 0) {
+    if (!table.runs || table.runs.length === 0) {
       return "No runs";
     }
-    return table.Run[0].status;
+    return table.runs[0].status;
   };
 
   if (tables.length === 0) {
@@ -197,7 +197,7 @@ export default function Dashboard() {
                       </td>
                       <td className="relative py-4 pr-4 pl-3 text-right text-sm font-medium whitespace-nowrap sm:pr-6">
                         <a
-                          href={`/tables/${table.id}`}
+                          href={`/app/${table.id}`}
                           className="text-indigo-600 hover:text-indigo-900"
                         >
                           View<span className="sr-only">, {table.name}</span>
