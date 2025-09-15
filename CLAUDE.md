@@ -51,6 +51,19 @@ npm run postinstall
 - `app/queues/workers/` - Background job processors
 - `prisma/` - Database schema and migrations
 
+### CSV Playground
+
+The CSV Playground (`app/routes/csv-playground.tsx`) provides an interactive interface for CSV file exploration:
+
+- **Streaming CSV Parsing**: Uses Papaparse for efficient parsing of large CSV files with chunked loading
+- **Virtualized Table Rendering**: Implements @tanstack/react-virtual for optimal performance with large datasets
+- **Progressive Loading**: Automatically loads more rows as users scroll, preventing memory issues
+- **Interactive Features**:
+  - Drag-and-drop file upload
+  - Auto-scroll functionality for testing
+  - Real-time row/column count display
+  - URL and email link detection in cells
+
 ### Background Processing
 
 The application uses BullMQ workers for processing CSV enrichment jobs:
