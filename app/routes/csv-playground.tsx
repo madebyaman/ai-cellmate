@@ -1,12 +1,12 @@
-import { useState, useRef, useEffect } from "react";
-import { Upload, FileText, AlertCircle } from "lucide-react";
+import { useVirtualizer, type VirtualItem } from "@tanstack/react-virtual";
+import { AlertCircle, FileText, Upload } from "lucide-react";
 import Papa from "papaparse";
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { memo, useEffect, useRef, useState } from "react";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 
 // Constants
-const CHUNK_SIZE = 50;
+const CHUNK_SIZE = 5000;
 const ROW_HEIGHT = 45;
 const LOAD_MORE_THRESHOLD = 20; // Load more when within 50 rows of the end
 
@@ -17,17 +17,117 @@ interface CSVData {
   hasMore: boolean;
 }
 
-export default function CSVPlayground() {
-  const [csvData, setCsvData] = useState<CSVData | null>(null);
-  const [fileName, setFileName] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [isDragOver, setIsDragOver] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [loadMoreRequested, setLoadMoreRequested] = useState(false);
-  console.log("lenght of csv rolws", csvData?.rows.length);
+interface CSVRowProps {
+  row: string[];
+  rowIndex: number;
+  virtualItem: VirtualItem;
+}
 
+const CSVRow = ({ row, rowIndex, virtualItem }: CSVRowProps) => {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 0,
+        left: 0,
+        width: "100%",
+        height: `${virtualItem.size}px`,
+        transform: `translateY(${virtualItem.start}px)`,
+      }}
+      className="flex hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100"
+    >
+      <div className="px-4 py-3 text-sm text-gray-500 text-center font-mono w-16 border-r border-gray-200 flex items-center justify-center">
+        {rowIndex + 1}
+      </div>
+      {row.map((cell, cellIndex) => {
+        const isUrl = cell && (cell.startsWith("http") || cell.includes("@"));
+
+        return (
+          <div
+            key={cellIndex}
+            className="px-4 py-3 text-sm border-r border-gray-200 min-w-[120px] flex-1 flex items-center"
+          >
+            {cell ? (
+              isUrl ? (
+                cell.includes("@") ? (
+                  <a
+                    href={`mailto:${cell}`}
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {cell}
+                  </a>
+                ) : (
+                  <a
+                    href={cell}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-blue-600 hover:text-blue-800 hover:underline"
+                  >
+                    {cell}
+                  </a>
+                )
+              ) : (
+                <div
+                  className={`text-gray-900 ${cell.length > 50 ? "max-w-xs truncate" : ""}`}
+                  title={cell}
+                >
+                  {cell}
+                </div>
+              )
+            ) : (
+              <span className="text-gray-400">—</span>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const csvRowCompareFn = (prevProps: CSVRowProps, nextProps: CSVRowProps) => {
+  // Compare rowIndex
+  if (prevProps.rowIndex !== nextProps.rowIndex) {
+    return false;
+  }
+
+  // Compare virtualItem properties that affect rendering
+  if (
+    prevProps.virtualItem.key !== nextProps.virtualItem.key ||
+    prevProps.virtualItem.size !== nextProps.virtualItem.size ||
+    prevProps.virtualItem.start !== nextProps.virtualItem.start
+  ) {
+    return false;
+  }
+
+  // Compare row data (array of strings)
+  if (prevProps.row.length !== nextProps.row.length) {
+    return false;
+  }
+
+  for (let i = 0; i < prevProps.row.length; i++) {
+    if (prevProps.row[i] !== nextProps.row[i]) {
+      return false;
+    }
+  }
+
+  // All comparisons passed, props are equal
+  return true;
+};
+
+const MemoizedCSVRow = memo(CSVRow, csvRowCompareFn);
+
+interface VirtualizedTableProps {
+  csvData: CSVData;
+  isAutoScrolling: boolean;
+  onAutoScrollToggle: () => void;
+}
+
+const VirtualizedTable = ({
+  csvData,
+  isAutoScrolling,
+  onAutoScrollToggle,
+}: VirtualizedTableProps) => {
   // Refs
-  const currentParserRef = useRef<any>(null);
   const parentRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
 
@@ -37,33 +137,152 @@ export default function CSVPlayground() {
     getScrollElement: () => parentRef.current,
     estimateSize: () => ROW_HEIGHT,
     overscan: 10, // Load extra rows for smooth scrolling
+    getItemKey: (index) => index, // Use index as key since it's unique
   });
 
-  // Auto-load more data when scrolling near the end
-  useEffect(() => {
-    if (!csvData || !csvData.hasMore || isLoadingMore) return;
+  // Auto-scroll functionality
+  const startAutoScroll = () => {
+    if (!parentRef.current) return;
 
-    const virtualItems = rowVirtualizer.getVirtualItems();
-    if (virtualItems.length === 0) return;
+    let direction = "down";
+    let scrollSpeed = 100;
 
-    const lastVisibleIndex = virtualItems[virtualItems.length - 1].index;
-    const shouldLoadMore =
-      csvData.rows.length - lastVisibleIndex <= LOAD_MORE_THRESHOLD;
+    const scroll = () => {
+      if (!parentRef.current) return;
 
-    console.log("🔍 Scroll detection:", {
-      lastVisibleIndex,
-      totalRows: csvData.rows.length,
-      threshold: LOAD_MORE_THRESHOLD,
-      shouldLoadMore,
-      hasMore: csvData.hasMore,
-      isLoadingMore,
-    });
+      const container = parentRef.current;
+      const { scrollTop, scrollHeight, clientHeight } = container;
 
-    if (shouldLoadMore) {
-      console.log("🚀 Auto-triggering load more");
-      loadMoreRows();
+      if (direction === "down") {
+        if (scrollTop + clientHeight >= scrollHeight - 10) {
+          direction = "up";
+        } else {
+          container.scrollTop += scrollSpeed;
+        }
+      } else {
+        if (scrollTop <= 10) {
+          direction = "down";
+        } else {
+          container.scrollTop -= scrollSpeed;
+        }
+      }
+
+      animationFrameRef.current = requestAnimationFrame(scroll);
+    };
+
+    // Stop any existing animation
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
     }
-  }, [rowVirtualizer.getVirtualItems(), csvData, isLoadingMore]);
+
+    animationFrameRef.current = requestAnimationFrame(scroll);
+  };
+
+  const stopAutoScroll = () => {
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  };
+
+  // Handle auto-scroll toggle
+  useEffect(() => {
+    if (isAutoScrolling) {
+      startAutoScroll();
+    } else {
+      stopAutoScroll();
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, [isAutoScrolling]);
+
+  return (
+    <div
+      ref={parentRef}
+      className="flex-1 overflow-auto ring-1 ring-gray-200"
+      style={{
+        height: "100%",
+      }}
+    >
+      <div
+        style={{
+          height: `${rowVirtualizer.getTotalSize()}px`,
+          width: "100%",
+          position: "relative",
+        }}
+      >
+        {rowVirtualizer.getVirtualItems().map((virtualItem) => {
+          const row = csvData.rows[virtualItem.index];
+          const rowIndex = virtualItem.index;
+
+          return (
+            <MemoizedCSVRow
+              key={virtualItem.key}
+              row={row}
+              rowIndex={rowIndex}
+              virtualItem={virtualItem}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+function virtualTableCompareFn(
+  a: VirtualizedTableProps,
+  b: VirtualizedTableProps,
+) {
+  return (
+    a.csvData.rows.length === b.csvData.rows.length &&
+    a.isAutoScrolling === b.isAutoScrolling
+  );
+}
+
+const MemoizedVirtualTable = memo(VirtualizedTable, virtualTableCompareFn);
+
+export default function CSVPlayground() {
+  const [csvData, setCsvData] = useState<CSVData | null>(null);
+  const [fileName, setFileName] = useState<string>("");
+  const [error, setError] = useState<string>("");
+  const [isDragOver, setIsDragOver] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [loadMoreRequested, setLoadMoreRequested] = useState(false);
+  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
+
+  // Refs
+  const currentParserRef = useRef<any>(null);
+
+  // Auto-load more data when scrolling near the end
+  // useEffect(() => {
+  //   if (!csvData || !csvData.hasMore || isLoadingMore) return;
+
+  //   const virtualItems = rowVirtualizer.getVirtualItems();
+  //   if (virtualItems.length === 0) return;
+
+  //   const lastVisibleIndex = virtualItems[virtualItems.length - 1].index;
+  //   const shouldLoadMore =
+  //     csvData.rows.length - lastVisibleIndex <= LOAD_MORE_THRESHOLD;
+
+  //   console.log("🔍 Scroll detection:", {
+  //     lastVisibleIndex,
+  //     totalRows: csvData.rows.length,
+  //     threshold: LOAD_MORE_THRESHOLD,
+  //     shouldLoadMore,
+  //     hasMore: csvData.hasMore,
+  //     isLoadingMore,
+  //   });
+
+  //   if (shouldLoadMore) {
+  //     console.log("🚀 Auto-triggering load more");
+  //     loadMoreRows();
+  //   }
+  // }, [rowVirtualizer.getVirtualItems(), csvData, isLoadingMore]);
 
   const parseCSVFile = (
     file: File,
@@ -89,6 +308,7 @@ export default function CSVPlayground() {
       const parser = Papa.parse(file, {
         header: false,
         skipEmptyLines: true,
+        // worker:true,
         // No worker - required for pause/resume functionality
         step: (result, parser) => {
           totalProcessed++;
@@ -289,57 +509,11 @@ export default function CSVPlayground() {
     }
   };
 
-  const startAutoScroll = () => {
-    if (!parentRef.current) return;
-
-    let direction = "down";
-    let scrollSpeed = 100;
-
-    const scroll = () => {
-      if (!parentRef.current) return;
-
-      const container = parentRef.current;
-      const { scrollTop, scrollHeight, clientHeight } = container;
-
-      if (direction === "down") {
-        if (scrollTop + clientHeight >= scrollHeight - 10) {
-          direction = "up";
-        } else {
-          container.scrollTop += scrollSpeed;
-        }
-      } else {
-        if (scrollTop <= 10) {
-          direction = "down";
-        } else {
-          container.scrollTop -= scrollSpeed;
-        }
-      }
-
-      animationFrameRef.current = requestAnimationFrame(scroll);
-    };
-
-    // Stop any existing animation
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-    }
-
-    animationFrameRef.current = requestAnimationFrame(scroll);
-  };
-
-  const stopAutoScroll = () => {
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
+  const handleAutoScrollToggle = () => {
+    setIsAutoScrolling(!isAutoScrolling);
   };
 
   const resetData = () => {
-    // Stop auto-scroll animation
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
-
     // Abort current parser if it exists
     if (currentParserRef.current) {
       currentParserRef.current.abort();
@@ -351,6 +525,7 @@ export default function CSVPlayground() {
     setError("");
     setIsLoadingMore(false);
     setLoadMoreRequested(false);
+    setIsAutoScrolling(false);
   };
 
   if (!csvData) {
@@ -449,18 +624,14 @@ export default function CSVPlayground() {
           )}
           <Button
             variant="outline"
-            onClick={
-              animationFrameRef.current ? stopAutoScroll : startAutoScroll
-            }
+            onClick={handleAutoScrollToggle}
             className={
-              animationFrameRef.current
+              isAutoScrolling
                 ? "text-red-700 border-red-300 hover:bg-red-50"
                 : "text-green-700 border-green-300 hover:bg-green-50"
             }
           >
-            {animationFrameRef.current
-              ? "Stop Auto Scroll"
-              : "Start Auto Scroll"}
+            {isAutoScrolling ? "Stop Auto Scroll" : "Start Auto Scroll"}
           </Button>
           <Button
             variant="outline"
@@ -490,87 +661,11 @@ export default function CSVPlayground() {
       </div>
 
       {/* Virtualized Table */}
-      <div
-        ref={parentRef}
-        className="flex-1 overflow-auto ring-1 ring-gray-200"
-        style={{
-          height: "100%",
-        }}
-      >
-        <div
-          style={{
-            height: `${rowVirtualizer.getTotalSize()}px`,
-            width: "100%",
-            position: "relative",
-          }}
-        >
-          {rowVirtualizer.getVirtualItems().map((virtualItem) => {
-            const row = csvData.rows[virtualItem.index];
-            const rowIndex = virtualItem.index;
-
-            return (
-              <div
-                key={virtualItem.key}
-                style={{
-                  position: "absolute",
-                  top: 0,
-                  left: 0,
-                  width: "100%",
-                  height: `${virtualItem.size}px`,
-                  transform: `translateY(${virtualItem.start}px)`,
-                }}
-                className="flex hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100"
-              >
-                <div className="px-4 py-3 text-sm text-gray-500 text-center font-mono w-16 border-r border-gray-200 flex items-center justify-center">
-                  {rowIndex + 1}
-                </div>
-                {row.map((cell, cellIndex) => {
-                  const isUrl =
-                    cell && (cell.startsWith("http") || cell.includes("@"));
-
-                  return (
-                    <div
-                      key={cellIndex}
-                      className="px-4 py-3 text-sm border-r border-gray-200 min-w-[120px] flex-1 flex items-center"
-                    >
-                      {cell ? (
-                        isUrl ? (
-                          cell.includes("@") ? (
-                            <a
-                              href={`mailto:${cell}`}
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {cell}
-                            </a>
-                          ) : (
-                            <a
-                              href={cell}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-blue-600 hover:text-blue-800 hover:underline"
-                            >
-                              {cell}
-                            </a>
-                          )
-                        ) : (
-                          <div
-                            className={`text-gray-900 ${cell.length > 50 ? "max-w-xs truncate" : ""}`}
-                            title={cell}
-                          >
-                            {cell}
-                          </div>
-                        )
-                      ) : (
-                        <span className="text-gray-400">—</span>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+      <MemoizedVirtualTable
+        csvData={csvData}
+        isAutoScrolling={isAutoScrolling}
+        onAutoScrollToggle={handleAutoScrollToggle}
+      />
     </LayoutWrapper>
   );
 }
