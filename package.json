@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
+    "start:workers": "dotenv -e .env -- tsx worker.ts",
+    "dev:app": "react-router dev",
     "dev": "react-router dev & dotenv -e .env -- tsx worker.ts",
     "start": "react-router-serve ./build/server/index.js",
     "worker": "dotenv -e .env -- tsx worker.ts",

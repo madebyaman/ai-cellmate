@@ -19,6 +19,7 @@ export default [
   route("create-workspace", "routes/create-organization.tsx"),
   route("billing", "./routes/billing.tsx"),
   route("logout", "routes/logout.ts"),
+  route("csv-playground", "routes/csv-playground-vanilla.tsx"),
 
   // Redirect route for /app
   // route("app", "routes/middleware.tsx"),
