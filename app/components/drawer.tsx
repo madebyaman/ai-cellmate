@@ -1,5 +1,5 @@
 import { X } from "lucide-react";
-import { Dialog } from "radix-ui";
+import * as Dialog from "@radix-ui/react-dialog";
 import { Button } from "./ui/button";
 import type { ReactNode } from "react";
 
@@ -8,11 +8,13 @@ export default function Drawer({
   setOpen,
   title,
   children,
+  formId,
 }: {
   open: boolean;
   setOpen: (open: boolean) => void;
   title: string;
   children: ReactNode;
+  formId?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>
@@ -28,7 +30,7 @@ export default function Drawer({
           <div className="relative flex-1 overflow-auto p-5 bg-white">
             {children}
           </div>
-          <div className="flex shrink-0 gap-2 justify-end py-4 border-t border-gray-300">
+          <div className="flex shrink-0 gap-2 justify-end py-4 px-5 border-t border-gray-300">
             <Button
               type="button"
               onClick={() => setOpen(false)}
@@ -36,7 +38,9 @@ export default function Drawer({
             >
               Cancel
             </Button>
-            <Button type="submit">Save</Button>
+            <Button type="submit" form={formId}>
+              Save
+            </Button>
           </div>
         </Dialog.Content>
       </Dialog.Portal>

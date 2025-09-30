@@ -89,10 +89,14 @@ export default function WorkspaceDropdown({
           defaultValue={selectedOrgId ?? orgs[0].id}
           onValueChange={handleValueChange}
         >
-          <SelectTrigger className="w-full text-inherit bg-inherit data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed">
+          <SelectTrigger className="w-full md:min-w-48 text-inherit bg-inherit data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed">
             <SelectValue placeholder="Select a workspace" />
           </SelectTrigger>
-          <SelectContent sideOffset={5} position="popper" className="w-full">
+          <SelectContent
+            sideOffset={5}
+            position="popper"
+            className="w-full md:min-w-48"
+          >
             {orgs.map((project) => (
               <SelectItem key={project.id} value={project.id}>
                 {project.name}

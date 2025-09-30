@@ -130,11 +130,12 @@ export class VanillaVirtualizer {
 
       entries.forEach((entry) => {
         const element = entry.target as HTMLElement;
-        const indexAttr = element.getAttribute('data-index');
+        const indexAttr = element.getAttribute("data-index");
 
         if (indexAttr) {
           const index = parseInt(indexAttr, 10);
-          const newSize = entry.borderBoxSize?.[0]?.blockSize || element.offsetHeight;
+          const newSize =
+            entry.borderBoxSize?.[0]?.blockSize || element.offsetHeight;
           const oldSize = this.itemSizeCache.get(index);
 
           if (oldSize !== newSize) {
@@ -197,7 +198,7 @@ export class VanillaVirtualizer {
 
     // Clear existing nodes and tracking data
     this.pooledNodes.forEach((node) => {
-      node.style.visibility = 'hidden';
+      node.style.visibility = "hidden";
     });
     this.nodeDataMap.clear();
     this.renderedRange = { start: -1, end: -1 };
@@ -213,7 +214,7 @@ export class VanillaVirtualizer {
         node.className =
           "flex hover:bg-gray-50 transition-colors duration-150 border-b border-gray-100 absolute top-0 left-0 w-full";
         node.style.height = `${this.config.rowHeight}px`;
-        node.style.visibility = 'hidden';
+        node.style.visibility = "hidden";
         this.rowContainer.appendChild(node);
         this.pooledNodes.push(node);
 
@@ -223,16 +224,16 @@ export class VanillaVirtualizer {
     } else if (newPoolSize < currentPoolSize) {
       // Remove excess nodes from the pool
       const excessNodes = this.pooledNodes.splice(newPoolSize);
-      excessNodes.forEach(node => {
+      excessNodes.forEach((node) => {
         this.cleanupCellPool(node);
         node.remove();
       });
     }
 
     // Reset all existing nodes to clean state
-    this.pooledNodes.forEach(node => {
-      node.style.visibility = 'hidden';
-      node.innerHTML = '';
+    this.pooledNodes.forEach((node) => {
+      node.style.visibility = "hidden";
+      node.innerHTML = "";
     });
   }
 
@@ -341,30 +342,39 @@ export class VanillaVirtualizer {
     }
 
     // Update all pooled nodes
-    this.pooledNodes.forEach(node => {
+    this.pooledNodes.forEach((node) => {
       const currentDataIndex = this.nodeDataMap.get(node);
 
-      if (currentDataIndex !== undefined && visibleIndexes.has(currentDataIndex)) {
+      if (
+        currentDataIndex !== undefined &&
+        visibleIndexes.has(currentDataIndex)
+      ) {
         // Node is visible - ensure it's positioned correctly and visible
         const yPosition = this.getItemOffset(currentDataIndex);
         node.style.transform = `translateY(${yPosition}px)`;
-        node.style.visibility = 'visible';
-        node.setAttribute('data-index', currentDataIndex.toString());
+        node.style.visibility = "visible";
+        node.setAttribute("data-index", currentDataIndex.toString());
 
         // Observe for size changes if not already observing
-        if (this.itemResizeObserver && !this.itemSizeCache.has(currentDataIndex)) {
+        if (
+          this.itemResizeObserver &&
+          !this.itemSizeCache.has(currentDataIndex)
+        ) {
           this.itemResizeObserver.observe(node);
         }
 
         // Update content
-        const row = this.csvData.rows[currentDataIndex];
+        const row = this.csvData?.rows[currentDataIndex];
         this.config.onRowRender(node, row, currentDataIndex, this.isMobile);
       } else {
         // Node is not visible - hide it but keep in DOM
-        node.style.visibility = 'hidden';
+        node.style.visibility = "hidden";
 
         // Clear data association if outside range
-        if (currentDataIndex !== undefined && !visibleIndexes.has(currentDataIndex)) {
+        if (
+          currentDataIndex !== undefined &&
+          !visibleIndexes.has(currentDataIndex)
+        ) {
           this.nodeDataMap.delete(node);
         }
       }
@@ -375,8 +385,9 @@ export class VanillaVirtualizer {
     const availableNodes: HTMLDivElement[] = [];
 
     for (let i = overscanStart; i <= overscanEnd; i++) {
-      const hasAssignedNode = Array.from(this.nodeDataMap.entries())
-        .some(([node, index]) => index === i);
+      const hasAssignedNode = Array.from(this.nodeDataMap.entries()).some(
+        ([node, index]) => index === i,
+      );
 
       if (!hasAssignedNode) {
         unassignedIndexes.push(i);
@@ -384,15 +395,21 @@ export class VanillaVirtualizer {
     }
 
     // Find nodes that are not assigned to any visible index
-    this.pooledNodes.forEach(node => {
+    this.pooledNodes.forEach((node) => {
       const currentDataIndex = this.nodeDataMap.get(node);
-      if (currentDataIndex === undefined || !visibleIndexes.has(currentDataIndex)) {
+      if (
+        currentDataIndex === undefined ||
+        !visibleIndexes.has(currentDataIndex)
+      ) {
         availableNodes.push(node);
       }
     });
 
     // Assign available nodes to unassigned indexes
-    const assignmentCount = Math.min(unassignedIndexes.length, availableNodes.length);
+    const assignmentCount = Math.min(
+      unassignedIndexes.length,
+      availableNodes.length,
+    );
     for (let i = 0; i < assignmentCount; i++) {
       const node = availableNodes[i];
       const dataIndex = unassignedIndexes[i];
@@ -401,8 +418,8 @@ export class VanillaVirtualizer {
       // Position and show the node
       const yPosition = this.getItemOffset(dataIndex);
       node.style.transform = `translateY(${yPosition}px)`;
-      node.style.visibility = 'visible';
-      node.setAttribute('data-index', dataIndex.toString());
+      node.style.visibility = "visible";
+      node.setAttribute("data-index", dataIndex.toString());
 
       // Track this node's data index
       this.nodeDataMap.set(node, dataIndex);
@@ -478,7 +495,7 @@ export class VanillaVirtualizer {
         index: i,
         start: offset,
         end: offset + size,
-        size
+        size,
       };
 
       this.measurementsCache.push(item);
@@ -487,7 +504,8 @@ export class VanillaVirtualizer {
 
     // Update spacer height based on new measurements
     if (this.spacer && this.measurementsCache.length > 0) {
-      const lastItem = this.measurementsCache[this.measurementsCache.length - 1];
+      const lastItem =
+        this.measurementsCache[this.measurementsCache.length - 1];
       this.spacer.style.height = `${lastItem.end}px`;
       this.state.spacerHeight = lastItem.end;
     }
@@ -566,7 +584,7 @@ export class VanillaVirtualizer {
         ...cellPool.emptyElements,
       ];
 
-      allElements.forEach(element => {
+      allElements.forEach((element) => {
         if (element.parentNode) {
           element.parentNode.removeChild(element);
         }
@@ -640,13 +658,19 @@ export function createOptimizedRowRenderer(
       return createDefaultRowRenderer(csvData)(node, row, rowIndex, isMobile);
     }
 
-    const { rowNumberCell, dataCells, linkElements, textElements, emptyElements } = cellPool;
+    const {
+      rowNumberCell,
+      dataCells,
+      linkElements,
+      textElements,
+      emptyElements,
+    } = cellPool;
 
     // Only rebuild DOM structure if it doesn't exist
     if (node.children.length === 0) {
       // Initial setup - add all cells to DOM
       node.appendChild(rowNumberCell);
-      dataCells.forEach(cellDiv => {
+      dataCells.forEach((cellDiv) => {
         node.appendChild(cellDiv);
       });
     }
@@ -668,15 +692,16 @@ export function createOptimizedRowRenderer(
 
       // Get or create appropriate content element on demand
       let contentElement: HTMLElement;
-      let elementType: 'link' | 'text' | 'empty';
+      let elementType: "link" | "text" | "empty";
 
       if (isUrl) {
-        elementType = 'link';
+        elementType = "link";
         // Get existing link element or create new one
-        let linkElement = cellDiv.querySelector('a') as HTMLAnchorElement;
+        let linkElement = cellDiv.querySelector("a") as HTMLAnchorElement;
         if (!linkElement) {
           linkElement = document.createElement("a");
-          linkElement.className = "text-blue-600 hover:text-blue-800 hover:underline";
+          linkElement.className =
+            "text-blue-600 hover:text-blue-800 hover:underline";
           linkElement.target = "_blank";
           linkElement.rel = "noopener noreferrer";
           cellDiv.innerHTML = ""; // Clear before adding
@@ -684,10 +709,14 @@ export function createOptimizedRowRenderer(
         }
         contentElement = linkElement;
       } else if (!isEmpty) {
-        elementType = 'text';
+        elementType = "text";
         // Get existing text div or create new one
-        let textElement = cellDiv.querySelector('div:not(a)') as HTMLDivElement;
-        if (!textElement || cellDiv.querySelector('a') || cellDiv.querySelector('span')) {
+        let textElement = cellDiv.querySelector("div:not(a)") as HTMLDivElement;
+        if (
+          !textElement ||
+          cellDiv.querySelector("a") ||
+          cellDiv.querySelector("span")
+        ) {
           textElement = document.createElement("div");
           textElement.className = "text-gray-900";
           cellDiv.innerHTML = ""; // Clear before adding
@@ -695,9 +724,9 @@ export function createOptimizedRowRenderer(
         }
         contentElement = textElement;
       } else {
-        elementType = 'empty';
+        elementType = "empty";
         // Get existing empty span or create new one
-        let emptyElement = cellDiv.querySelector('span') as HTMLSpanElement;
+        let emptyElement = cellDiv.querySelector("span") as HTMLSpanElement;
         if (!emptyElement) {
           emptyElement = document.createElement("span");
           emptyElement.className = "text-gray-400";
@@ -709,7 +738,7 @@ export function createOptimizedRowRenderer(
       }
 
       // Update content based on element type
-      if (elementType === 'link') {
+      if (elementType === "link") {
         const linkElement = contentElement as HTMLAnchorElement;
         if (linkElement.textContent !== cell) {
           linkElement.textContent = cell;
@@ -718,7 +747,7 @@ export function createOptimizedRowRenderer(
         if (linkElement.href !== newHref) {
           linkElement.href = newHref;
         }
-      } else if (elementType === 'text') {
+      } else if (elementType === "text") {
         const textElement = contentElement as HTMLDivElement;
         const maxLength = isMobile ? 30 : 50;
         const newClassName = `text-gray-900 ${

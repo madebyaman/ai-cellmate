@@ -231,9 +231,9 @@ model CellVersions {
   pickedAt   DateTime?
 
   cellId String
-  cell   Cell   @relation(fields: [cellId], references: [id], onDelete: Cascade)
-  runId  String
-  run    Run    @relation(fields: [runId], references: [id])
+  cell   Cell    @relation(fields: [cellId], references: [id], onDelete: Cascade)
+  runId  String?
+  run    Run?    @relation(fields: [runId], references: [id])
 
   @@index([cellId, createdAt])
   @@index([cellId, picked]) // quick “current value”

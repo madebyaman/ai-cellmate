@@ -73,6 +73,11 @@ export async function validateSubscriptionAndCredits(
   orgId: string,
   requiredCredits: number = 1,
 ): Promise<{ valid: boolean; error?: SubscriptionError }> {
+  // Check if DEV_MODE is enabled
+  if (process.env.DEV_MODE === "true") {
+    return { valid: true };
+  }
+
   const [subscription, credits] = await Promise.all([
     getSubscription(request, orgId),
     getOrganizationCredits(request, orgId),
