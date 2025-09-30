@@ -68,7 +68,109 @@ export async function getTableWithCachedData(
     cachedData = await updateCachedTable(tableId);
   }
 
-  const status = runs[0].status ?? "PENDING";
+  const status = runs[0]?.status ?? "PENDING";
 
   return { table: tableWithoutCachedData, cachedData, status };
+}
+
+export async function deleteTable(tableId: string, organizationId: string) {
+  console.log("=== Starting Table Deletion ===");
+  console.log("Table ID:", tableId);
+  console.log("Organization ID:", organizationId);
+
+  // Verify the table belongs to the organization
+  const table = await prisma.table.findFirst({
+    where: {
+      id: tableId,
+      organizationId,
+    },
+  });
+
+  if (!table) {
+    console.error("Table not found or doesn't belong to organization");
+    throw new Error("Table not found");
+  }
+
+  console.log("Table found:", table.name);
+
+  // Delete in the correct order due to foreign key constraints
+  // 1. Delete cell versions first
+  console.log("Deleting cell versions...");
+  const deletedCellVersions = await prisma.cellVersions.deleteMany({
+    where: {
+      cell: {
+        row: {
+          tableId,
+        },
+      },
+    },
+  });
+  console.log("Deleted cell versions:", deletedCellVersions.count);
+
+  // 2. Delete cells
+  console.log("Deleting cells...");
+  const deletedCells = await prisma.cell.deleteMany({
+    where: {
+      row: {
+        tableId,
+      },
+    },
+  });
+  console.log("Deleted cells:", deletedCells.count);
+
+  // 3. Delete rows
+  console.log("Deleting rows...");
+  const deletedRows = await prisma.row.deleteMany({
+    where: {
+      tableId,
+    },
+  });
+  console.log("Deleted rows:", deletedRows.count);
+
+  // 4. Delete columns
+  console.log("Deleting columns...");
+  const deletedColumns = await prisma.column.deleteMany({
+    where: {
+      tableId,
+    },
+  });
+  console.log("Deleted columns:", deletedColumns.count);
+
+  // 5. Delete hints
+  console.log("Deleting hints...");
+  const deletedHints = await prisma.hint.deleteMany({
+    where: {
+      tableId,
+    },
+  });
+  console.log("Deleted hints:", deletedHints.count);
+
+  // 6. Delete runs
+  console.log("Deleting runs...");
+  const deletedRuns = await prisma.run.deleteMany({
+    where: {
+      tableId,
+    },
+  });
+  console.log("Deleted runs:", deletedRuns.count);
+
+  // 7. Delete cached table
+  console.log("Deleting cached table...");
+  const deletedCachedTable = await prisma.cachedTable.deleteMany({
+    where: {
+      tableId,
+    },
+  });
+  console.log("Deleted cached table:", deletedCachedTable.count);
+
+  // 8. Finally delete the table itself
+  console.log("Deleting table...");
+  await prisma.table.delete({
+    where: {
+      id: tableId,
+    },
+  });
+  console.log("Table deleted successfully");
+
+  console.log("=== Table Deletion Complete ===");
 }
