@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Plus } from "lucide-react";
 import {
   data,
@@ -11,10 +12,12 @@ import {
 import { format } from "date-fns";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
+import { CSVUploadModal } from "~/components/csv-upload-modal";
 import {
   getActiveOrganizationId,
   requireActiveOrg,
   validateSubscriptionAndCredits,
+  requireUser,
 } from "~/utils/auth.server";
 import { ROUTES } from "~/utils/constants";
 import { redirectWithToast } from "~/utils/toast.server";
@@ -22,6 +25,8 @@ import {
   getTablesForOrganization,
   type TableWithLatestRun,
 } from "~/lib/table.server";
+import { generateEnrichmentColumns } from "~/lib/ai-column-generator.server";
+import { uploadAndProcessCSV } from "~/lib/csv-upload.server";
 // import { verifyUserAccessToOrganization } from "~/utils/organization.server";
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -34,6 +39,106 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export async function action({ request }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
+
+  if (intent === "generate-columns") {
+    const orgId = await getActiveOrganizationId(request);
+    UNSAFE_invariant(orgId, "No organization id found");
+
+    // Validate subscription and credits before AI generation
+    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
+
+    if (!validation.valid) {
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description:
+          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
+        title: "No subscription or credits left",
+      });
+    }
+
+    const prompt = formData.get("prompt") as string;
+
+    if (!prompt) {
+      return data({ error: "Prompt is required" }, { status: 400 });
+    }
+
+    try {
+      const columns = await generateEnrichmentColumns(prompt);
+      return data({ columns });
+    } catch (error) {
+      console.error("Error generating columns:", error);
+      return data(
+        { error: "Failed to generate columns. Please try again." },
+        { status: 500 },
+      );
+    }
+  }
+
+  if (intent === "upload-csv") {
+    const orgId = await getActiveOrganizationId(request);
+    UNSAFE_invariant(orgId, "No organization id found while uploading CSV");
+
+    // Server-side validation - check if user has subscription and at least 10 credits
+    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
+
+    if (!validation.valid) {
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description:
+          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
+        title: "No subscription or credits left",
+      });
+    }
+
+    const session = await requireUser(request);
+    UNSAFE_invariant(session.user, "No user found");
+
+    const file = formData.get("file") as File;
+    const enrichmentColumnsJson = formData.get("enrichmentColumns") as string;
+    const enrichmentPrompt = formData.get("enrichmentPrompt") as string;
+    const websitesJson = formData.get("websites") as string;
+
+    if (!file) {
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description: "Please upload a CSV file.",
+        title: "Missing CSV file",
+      });
+    }
+
+    const enrichmentColumns = JSON.parse(
+      enrichmentColumnsJson || "[]",
+    ) as Array<{ name: string; type: string }>;
+    const websites = JSON.parse(websitesJson || "[]") as string[];
+
+    if (enrichmentColumns.length === 0) {
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description: "Please add at least one enrichment column.",
+        title: "Missing enrichment columns",
+      });
+    }
+
+    try {
+      const tableId = await uploadAndProcessCSV({
+        file,
+        enrichmentColumns,
+        enrichmentPrompt,
+        websites,
+        organizationId: orgId,
+        createdBy: session.user.name,
+      });
+
+      return redirect(`/app/${tableId}`);
+    } catch (error) {
+      console.error("Error uploading CSV:", error);
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description: "Failed to process CSV file. Please try again.",
+        title: "Upload Error",
+      });
+    }
+  }
 
   if (intent === "add-new-data") {
     const orgId = await getActiveOrganizationId(request);
@@ -63,11 +168,10 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Dashboard() {
   const { tables } = useLoaderData<{ tables: TableWithLatestRun[] }>();
   const fetcher = useFetcher();
+  const [showUploadModal, setShowUploadModal] = useState(false);
 
   const handleAddNewData = () => {
-    const formData = new FormData();
-    formData.append("intent", "add-new-data");
-    fetcher.submit(formData, { method: "POST" });
+    setShowUploadModal(true);
   };
 
   const formatDate = (date: string | Date) => {
@@ -109,6 +213,11 @@ export default function Dashboard() {
             </Button>
           </div>
         </div>
+
+        <CSVUploadModal
+          isOpen={showUploadModal}
+          onClose={() => setShowUploadModal(false)}
+        />
       </LayoutWrapper>
     );
   }
@@ -211,6 +320,11 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <CSVUploadModal
+        isOpen={showUploadModal}
+        onClose={() => setShowUploadModal(false)}
+      />
     </LayoutWrapper>
   );
 }

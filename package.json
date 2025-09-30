@@ -50,6 +50,7 @@
     "langfuse": "^3.38.4",
     "langfuse-vercel": "^3.38.4",
     "lucide-react": "^0.536.0",
+    "motion": "^12.23.22",
     "papaparse": "^5.5.3",
     "prisma": "^6.13.0",
     "radix-ui": "^1.4.2",
