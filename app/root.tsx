@@ -116,10 +116,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     details = error.message;
     stack = error.stack;
   }
-  if (
-    message.trim() ===
-    `TypeError: Cannot read properties of null (reading 'useContext')`
-  ) {
+  if (stack && stack.includes('useContext')) {
     console.error("useContext error, full reload");
     window.location.reload();
   }

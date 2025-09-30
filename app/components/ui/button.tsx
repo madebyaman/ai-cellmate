@@ -11,12 +11,13 @@ const getVariantClasses = (variant: string = "default") => {
     outline: "border border-slate-300 bg-white hover:bg-slate-50 shadow-none",
     secondary:
       "bg-gradient-to-br from-gray-800 to-gray-900 text-white ring-gray-400",
-    ghost:
-      "hover:bg-primary-300/30 border-none shadow-none hover:shadow-none text-primary-700",
+    ghost: "hover:bg-gray-300/30 border-none shadow-none hover:shadow-none",
     link: "text-primary-600 hover:text-gray-800 hover:no-underline border-none shadow-none hover:shadow-none",
     icon: "border rounded-full border-slate-300 text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-slate-300",
   };
-  return variants[variant in variants ? variant as keyof typeof variants : 'default'];
+  return variants[
+    variant in variants ? (variant as keyof typeof variants) : "default"
+  ];
 };
 
 const getSizeClasses = (size: string = "default") => {
@@ -29,7 +30,7 @@ const getSizeClasses = (size: string = "default") => {
     pill: "px-12 py-3 leading-3",
     icon: "h-10 w-10",
   };
-  return sizes[size in sizes ? size as keyof typeof sizes : 'default'];
+  return sizes[size in sizes ? (size as keyof typeof sizes) : "default"];
 };
 
 export interface ButtonProps
@@ -94,3 +95,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
 Button.displayName = "Button";
 
 export { Button };
+
+/**
+ * Expand the hit area to at least 44×44px on touch devices
+ */
+export function TouchTarget({ children }: { children: React.ReactNode }) {
+  return (
+    <>
+      <span
+        className="absolute top-1/2 left-1/2 size-[max(100%,2.75rem)] -translate-x-1/2 -translate-y-1/2 [@media(pointer:fine)]:hidden"
+        aria-hidden="true"
+      />
+      {children}
+    </>
+  );
+}
