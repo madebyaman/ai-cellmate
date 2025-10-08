@@ -13,6 +13,7 @@
     "typecheck": "react-router typegen && tsc",
     "postinstall": "prisma generate",
     "db:seed": "dotenv -e .env -- tsx prisma/seed.ts",
+    "test:gemini": "dotenv -e .env -- tsx scripts/test-gemini-structured-output.ts",
     "test": "vitest",
     "test:ui": "vitest --ui",
     "test:run": "vitest run"

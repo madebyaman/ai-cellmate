@@ -29,11 +29,8 @@ export interface ImageJobData {
 
 // CSV enrichment job types
 export interface CsvEnrichmentJobData {
-  csvUrl?: string;
-  csvContent?: string;
-  enrichmentPrompt?: string;
-  outputUrl?: string;
-  userId?: string;
+  runId: string;
+  userId: string;
 }
 
 // Union types for all job data

@@ -1,10 +1,12 @@
 import Papa from "papaparse";
 import { prisma } from "~/lib/prisma.server";
 import { updateCachedTable } from "~/lib/cached-table.server";
+import { addCsvEnrichmentJob } from "~/queues/queues";
 
 interface EnrichmentColumn {
   name: string;
   type: string;
+  description: string;
 }
 
 export async function uploadAndProcessCSV({
@@ -98,6 +100,22 @@ export async function uploadAndProcessCSV({
   const columns = [...sourceColumns, ...enrichmentColumnsCreated];
   console.log("✓ Created", sourceColumns.length, "SOURCE columns and", enrichmentColumnsCreated.length, "ENRICHMENT columns");
 
+  // Create column-level hints for enrichment columns
+  console.log("Creating column hints...");
+  await Promise.all(
+    enrichmentColumns.map((col, index) =>
+      prisma.hint.create({
+        data: {
+          columnId: enrichmentColumnsCreated[index].id,
+          scope: "COLUMN",
+          prompt: col.description,
+          websites: [], // Column hints don't have websites, only table hints do
+        },
+      }),
+    ),
+  );
+  console.log("✓ Created", enrichmentColumns.length, "column hints");
+
   // Create rows and cells
   console.log("Creating", csvDataRows.length, "rows with cells...");
 
@@ -158,6 +176,14 @@ export async function uploadAndProcessCSV({
     },
   });
   console.log("✓ Run created:", run.id);
+
+  // Queue enrichment job
+  console.log("Queueing enrichment job...");
+  await addCsvEnrichmentJob({
+    runId: run.id,
+    userId: createdBy,
+  });
+  console.log("✓ Enrichment job queued");
 
   // Generate cached table
   console.log("Updating cached table...");

@@ -11,6 +11,7 @@ import Select from "./ui/select";
 interface EnrichmentColumn {
   name: string;
   type: "String" | "Number" | "Boolean";
+  description: string;
 }
 
 interface CSVUploadModalProps {
@@ -27,7 +28,7 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
     [],
   );
   const [manualColumns, setManualColumns] = useState<EnrichmentColumn[]>([
-    { name: "", type: "String" },
+    { name: "", type: "String", description: "" },
   ]);
   const [enrichmentPrompt, setEnrichmentPrompt] = useState("");
   const [websites, setWebsites] = useState<string[]>([]);
@@ -90,7 +91,7 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
   };
 
   const addManualColumn = () => {
-    setManualColumns([...manualColumns, { name: "", type: "String" }]);
+    setManualColumns([...manualColumns, { name: "", type: "String", description: "" }]);
   };
 
   const updateManualColumn = (
@@ -240,40 +241,51 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
 
             {/* Generated Columns - Editable */}
             {generatedColumns.length > 0 && (
-              <div className="space-y-2">
+              <div className="space-y-3">
                 <Label htmlFor="generated-columns">
                   Generated Columns (you can edit/remove)
                 </Label>
                 {generatedColumns.map((column, index) => (
-                  <div key={index} className="flex gap-2">
-                    <Input
-                      value={column.name}
+                  <div key={index} className="space-y-2 p-3 border border-gray-200 rounded-md">
+                    <div className="flex gap-2">
+                      <Input
+                        value={column.name}
+                        onChange={(e) =>
+                          updateGeneratedColumn(index, "name", e.target.value)
+                        }
+                        placeholder="Column name"
+                        className="flex-1"
+                      />
+                      <Select
+                        value={column.type}
+                        onChange={(e) =>
+                          updateGeneratedColumn(index, "type", e.target.value)
+                        }
+                        className="w-32"
+                      >
+                        <option value="String">String</option>
+                        <option value="Number">Number</option>
+                        <option value="Boolean">Boolean</option>
+                      </Select>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeGeneratedColumn(index)}
+                        className="text-gray-600"
+                      >
+                        <Trash className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={column.description}
                       onChange={(e) =>
-                        updateGeneratedColumn(index, "name", e.target.value)
+                        updateGeneratedColumn(index, "description", e.target.value)
                       }
-                      placeholder="Column name"
-                      className="flex-1"
+                      placeholder="Description of what data to find and how..."
+                      rows={2}
+                      className="text-sm"
                     />
-                    <Select
-                      value={column.type}
-                      onChange={(e) =>
-                        updateGeneratedColumn(index, "type", e.target.value)
-                      }
-                      className="w-32"
-                    >
-                      <option value="String">String</option>
-                      <option value="Number">Number</option>
-                      <option value="Boolean">Boolean</option>
-                    </Select>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => removeGeneratedColumn(index)}
-                      className="text-gray-600"
-                    >
-                      <Trash className="h-4 w-4" />
-                    </Button>
                   </div>
                 ))}
               </div>
@@ -297,39 +309,53 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
               </Button>
             </div>
 
-            {manualColumns.map((column, index) => (
-              <div key={index} className="flex gap-2 mb-2">
-                <Input
-                  value={column.name}
-                  onChange={(e) =>
-                    updateManualColumn(index, "name", e.target.value)
-                  }
-                  placeholder="Column name"
-                  className="flex-1"
-                  required
-                />
-                <Select
-                  value={column.type}
-                  onChange={(e) =>
-                    updateManualColumn(index, "type", e.target.value)
-                  }
-                  className="w-32"
-                >
-                  <option value="String">String</option>
-                  <option value="Number">Number</option>
-                  <option value="Boolean">Boolean</option>
-                </Select>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeManualColumn(index)}
-                  className="text-gray-600"
-                >
-                  <Trash className="h-4 w-4" />
-                </Button>
-              </div>
-            ))}
+            <div className="space-y-3">
+              {manualColumns.map((column, index) => (
+                <div key={index} className="space-y-2 p-3 border border-gray-200 rounded-md">
+                  <div className="flex gap-2">
+                    <Input
+                      value={column.name}
+                      onChange={(e) =>
+                        updateManualColumn(index, "name", e.target.value)
+                      }
+                      placeholder="Column name"
+                      className="flex-1"
+                      required
+                    />
+                    <Select
+                      value={column.type}
+                      onChange={(e) =>
+                        updateManualColumn(index, "type", e.target.value)
+                      }
+                      className="w-32"
+                    >
+                      <option value="String">String</option>
+                      <option value="Number">Number</option>
+                      <option value="Boolean">Boolean</option>
+                    </Select>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => removeManualColumn(index)}
+                      className="text-gray-600"
+                    >
+                      <Trash className="h-4 w-4" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={column.description}
+                    onChange={(e) =>
+                      updateManualColumn(index, "description", e.target.value)
+                    }
+                    placeholder="Description: What data should this column contain and how to find it..."
+                    rows={2}
+                    className="text-sm"
+                    required
+                  />
+                </div>
+              ))}
+            </div>
 
             {manualColumns.length === 0 && (
               <p className="text-sm text-gray-500">

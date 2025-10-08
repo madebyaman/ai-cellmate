@@ -1,19 +1,28 @@
 import { generateObject } from "ai";
 import { z } from "zod";
-import { openai } from "@ai-sdk/openai";
+import { google } from "@ai-sdk/google";
 import type { BulkCrawlResponse } from "./scraper-tool";
 
-const resultExtractorSchema = z.object({
-  extractedData: z.record(
-    z.string().describe("Column name from CSV header"),
-    z.object({
+// Helper function to create schema dynamically based on missing columns
+const createResultExtractorSchema = (missingColumns: string[]) => {
+  const columnSchemas: Record<string, z.ZodOptional<z.ZodObject<any>>> = {};
+
+  for (const column of missingColumns) {
+    columnSchemas[column] = z.object({
       result: z.string().describe("The extracted value for this column"),
       source: z.string().describe("The source URL where this information was found"),
-    }),
-  ).describe("Extracted data mapped by column name"),
-});
+    }).optional();
+  }
 
-type ResultExtractorResult = z.infer<typeof resultExtractorSchema>;
+  return z.object(columnSchemas);
+};
+
+type ResultExtractorResult = {
+  [key: string]: {
+    result: string;
+    source: string;
+  } | undefined;
+};
 
 interface ExtractionInput {
   row: Record<string, string>;
@@ -30,12 +39,20 @@ export const extractResultsFromCrawledData = async (
 
   // Identify missing or empty columns
   const missingColumns = headers.filter(
-    header => !row[header] || row[header].trim() === "" || row[header] === "-"
+    (header) =>
+      !row[header] || row[header].trim() === "" || row[header] === "-",
+  );
+
+  console.log(
+    `[EXTRACTION] Analyzing content for ${missingColumns.length} missing columns: ${missingColumns.join(", ")}`,
+  );
+  console.log(
+    `[EXTRACTION] Using Gemini 2.0 Flash (1M context) for large content processing`,
   );
 
   // Format crawled data for the prompt
-  const crawledContent = crawledData.success 
-    ? crawledData.results.map(result => ({
+  const crawledContent = crawledData.success
+    ? crawledData.results.map((result) => ({
         url: result.url,
         success: result.success,
         content: result.success ? result.result : `Error: ${result.result}`,
@@ -43,9 +60,12 @@ export const extractResultsFromCrawledData = async (
       }))
     : [];
 
+  // Create schema dynamically based on missing columns
+  const dynamicSchema = createResultExtractorSchema(missingColumns);
+
   const result = await generateObject({
-    model: openai("gpt-4o"),
-    schema: resultExtractorSchema,
+    model: google("gemini-2.5-flash"),
+    schema: dynamicSchema,
     system: `
     You are a CSV data extraction specialist. Your job is to analyze crawled webpage content and extract specific data to fill missing CSV cells.
 
@@ -74,7 +94,7 @@ export const extractResultsFromCrawledData = async (
     5. QUALITY STANDARDS:
        - Extract factual, specific information (avoid generic descriptions)
        - Prefer structured data (dates, numbers, names) over prose
-       - If you cannot find relevant information for a column, do not include it in the results
+       - If you cannot find relevant information for a column, omit it from the response
        - Ensure extracted data is consistent with the context of other filled columns
 
     IMPORTANT: Only return data for columns that are actually missing/empty in the input row. Do not extract data for columns that already have values.
@@ -90,19 +110,29 @@ Missing/Empty Columns to Fill:
 ${missingColumns.length > 0 ? missingColumns.join(", ") : "None - all columns are filled"}
 
 Crawled Webpage Content:
-${crawledContent.length > 0 
-  ? crawledContent.map((page, index) => `
+${
+  crawledContent.length > 0
+    ? crawledContent
+        .map(
+          (page, index) => `
 --- Page ${index + 1} ---
 URL: ${page.url}
 Status: ${page.success ? "Success" : "Failed"}
 Content:
 ${page.content}
-${page.links && page.links.length > 0 ? `
-Additional Links Found: ${page.links.slice(0, 5).join(", ")}${page.links.length > 5 ? "..." : ""}` : ""}
-`).join("\n")
-  : "No crawled content available"}
+${
+  page.links && page.links.length > 0
+    ? `
+Additional Links Found: ${page.links.slice(0, 5).join(", ")}${page.links.length > 5 ? "..." : ""}`
+    : ""
+}
+`,
+        )
+        .join("\n")
+    : "No crawled content available"
+}
 
-Analyze the crawled webpage content above and extract specific data to fill the missing CSV columns. 
+Analyze the crawled webpage content above and extract specific data to fill the missing CSV columns.
 
 For each missing column you can fill, provide:
 - The exact column name (must match CSV headers exactly)
@@ -125,6 +155,11 @@ Focus on extracting factual, specific information that directly answers what eac
   if (result.usage) {
     reportUsage("result-extracter", result.usage);
   }
+
+  const extractedColumns = Object.keys(result.object).filter(key => result.object[key] !== undefined);
+  console.log(
+    `[EXTRACTION] Extracted ${extractedColumns.length} column values: ${extractedColumns.join(", ")}`,
+  );
 
   return result.object;
 };
