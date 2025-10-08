@@ -287,15 +287,6 @@ export default function CSVView() {
           {/* Show different buttons based on state */}
           {enrichmentState !== "processing" && (
             <>
-              <Button
-                variant="outline"
-                className="text-gray-700 border-gray-300 hover:bg-gray-50"
-                onClick={() => setShowDetails(true)}
-              >
-                <Info className="w-4 h-4" />
-                View Details
-              </Button>
-
               {/* Export Button - only show when completed */}
               {enrichmentState === "completed" && (
                 <Button
@@ -314,13 +305,6 @@ export default function CSVView() {
               >
                 <Trash2 className="w-4 h-4" />
                 Delete
-              </Button>
-
-              <Button
-                onClick={(e) => setShowAIModal(true)}
-                className="bg-green-600 hover:bg-green-700 text-white"
-              >
-                Enrich Data
               </Button>
             </>
           )}
