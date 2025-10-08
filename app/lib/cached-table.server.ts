@@ -23,9 +23,10 @@ type SerializedRow = Omit<Row, "createdAt" | "updatedAt"> & {
   updatedAt: string;
 };
 
-type SerializedColumn = Omit<Column, "createdAt" | "updatedAt"> & {
+type SerializedColumn = Omit<Column, "createdAt" | "updatedAt" | "type"> & {
   createdAt: string;
   updatedAt: string;
+  type: "SOURCE" | "ENRICHMENT";
 };
 
 type SerializedCell = Omit<Cell, "createdAt" | "updatedAt"> & {
@@ -164,6 +165,7 @@ export async function updateCachedTable(
       id: column.id,
       tableId: table.id,
       name: column.name,
+      type: column.type as "SOURCE" | "ENRICHMENT",
       position: column.position,
       createdAt: column.createdAt.toISOString(),
       updatedAt: column.updatedAt.toISOString(),

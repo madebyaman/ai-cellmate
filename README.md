@@ -1,91 +1,27 @@
-# Welcome to React Router
-
-A modern, production-ready template for building full-stack React applications using React Router.
-
-[![Open in StackBlitz](https://developer.stackblitz.com/img/open_in_stackblitz.svg)](https://stackblitz.com/github/remix-run/react-router-templates/tree/main/default)
-
-## Features
-
-- 🚀 Server-side rendering
-- ⚡️ Hot Module Replacement (HMR)
-- 📦 Asset bundling and optimization
-- 🔄 Data loading and mutations
-- 🔒 TypeScript by default
-- 🎉 TailwindCSS for styling
-- 📖 [React Router docs](https://reactrouter.com/)
-
-## Getting Started
-
-### Installation
-
-Install the dependencies:
-
-```bash
-npm install
-```
-
-### Development
-
-Start the development server with HMR:
-
-```bash
-npm run dev
-```
-
-Your application will be available at `http://localhost:5173`.
-
-## Building for Production
-
-Create a production build:
-
-```bash
-npm run build
-```
-
-## Deployment
-
-### Docker Deployment
-
-To build and run using Docker:
-
-```bash
-docker build -t my-app .
-
-# Run the container
-docker run -p 3000:3000 my-app
-```
-
-The containerized application can be deployed to any platform that supports Docker, including:
-
-- AWS ECS
-- Google Cloud Run
-- Azure Container Apps
-- Digital Ocean App Platform
-- Fly.io
-- Railway
-
-### DIY Deployment
-
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
-
-Make sure to deploy the output of `npm run build`
-
-```
-├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
-├── build/
-│   ├── client/    # Static assets
-│   └── server/    # Server-side code
-```
-
-## Styling
-
-This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
-
----
-
-Built with ❤️ using React Router.
-
 ```sh
 stripe listen --forward-to localhost:5173/api/auth/stripe/webhook
 ```
+
+  2. Multi-Agent with Orchestrator (For complex leads)
+
+  Different agents handle different aspects:
+  - Profile Agent: Finds LinkedIn, validates job titles
+  - Contact Agent: Discovers emails, phones, alternative contacts
+  - Social Agent: Aggregates Twitter, GitHub, personal blogs
+  - Company Agent: Enriches company data (size, funding, tech stack)
+  - Orchestrator: Runs agents in parallel, merges results, handles conflicts
+
+  Pros: Parallelization, specialized prompts per domain, easier to A/B test agents
+  Cons: More complex, orchestration overhead, potential data conflicts
+
+
+Tasks
+
+- [] when a run is created add redis job with run Id
+- [] in that redis job, we need to find the runId and run the job. Only update the columns to be enriched
+- [] in the job, continue updating the table + status. Finally update the table cache.
+- [] we also need a redis entry or entries where we can use it to send streaming. How will it clear it itself. (Low priority)
+
+(Not Doing) Updating schema for enriched columns support
+- [] Update adding a new run at dashboard
+- [] Also update reading / creating cache

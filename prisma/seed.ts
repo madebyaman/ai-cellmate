@@ -116,6 +116,7 @@ async function main() {
       const column = await prisma.column.create({
         data: {
           name: tableConfig.columns[i],
+          type: "SOURCE", // All seed columns are SOURCE type
           position: i,
           tableId: table.id,
           createdAt: faker.date.past(),

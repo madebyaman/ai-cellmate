@@ -64,25 +64,39 @@ export async function uploadAndProcessCSV({
   });
   console.log("✓ Table created:", table.id);
 
-  // Create columns (CSV headers + enrichment columns)
-  const allColumnNames = [
-    ...csvHeaders,
-    ...enrichmentColumns.map((c) => c.name),
-  ];
+  // Create columns (CSV headers as SOURCE + enrichment columns as ENRICHMENT)
+  console.log("Creating", csvHeaders.length + enrichmentColumns.length, "columns");
 
-  console.log("Creating", allColumnNames.length, "columns");
-  const columns = await Promise.all(
-    allColumnNames.map((name, index) =>
+  // Create SOURCE columns from CSV headers
+  const sourceColumns = await Promise.all(
+    csvHeaders.map((name, index) =>
       prisma.column.create({
         data: {
           name,
+          type: "SOURCE",
           tableId: table.id,
           position: index,
         },
       }),
     ),
   );
-  console.log("✓ Created", columns.length, "columns");
+
+  // Create ENRICHMENT columns
+  const enrichmentColumnsCreated = await Promise.all(
+    enrichmentColumns.map((col, index) =>
+      prisma.column.create({
+        data: {
+          name: col.name,
+          type: "ENRICHMENT",
+          tableId: table.id,
+          position: csvHeaders.length + index,
+        },
+      }),
+    ),
+  );
+
+  const columns = [...sourceColumns, ...enrichmentColumnsCreated];
+  console.log("✓ Created", sourceColumns.length, "SOURCE columns and", enrichmentColumnsCreated.length, "ENRICHMENT columns");
 
   // Create rows and cells
   console.log("Creating", csvDataRows.length, "rows with cells...");
