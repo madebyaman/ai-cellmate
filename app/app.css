@@ -30,6 +30,8 @@
   --animate-slide-right: slideRight 400ms ease-in-out;
   --animate-slide-out-right: slideOutRight 200ms ease-in-out;
   --animate-overlay-show: overlayShow 400ms ease-in-out;
+  --animate-accordion-down: accordionDown 300ms cubic-bezier(0.87, 0, 0.13, 1);
+  --animate-accordion-up: accordionUp 300ms cubic-bezier(0.87, 0, 0.13, 1);
 
   @keyframes overlayShow {
     from: {
@@ -100,12 +102,31 @@
       transform: translateX(0);
     }
   }
+
   @keyframes slideOutRight {
     from {
       transform: translateX(0);
     }
     to {
       transform: translateX(100%);
+    }
+  }
+
+  @keyframes accordionDown {
+    from {
+      height: 0;
+    }
+    to: {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+
+  @keyframes accordionUp {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
     }
   }
 }
