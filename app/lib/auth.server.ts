@@ -47,7 +47,6 @@ export const auth = betterAuth({
       organizationCreation: {
         afterCreate: async (params) => {
           const { user, organization } = params;
-          console.log("RUNNING after create");
 
           // Create Stripe customer for the organization
           const customer = await createCustomer({

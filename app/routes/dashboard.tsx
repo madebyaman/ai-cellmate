@@ -108,7 +108,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     const enrichmentColumns = JSON.parse(
       enrichmentColumnsJson || "[]",
-    ) as Array<{ name: string; type: string }>;
+    ) as Array<{ name: string; type: string; description: string }>;
     const websites = JSON.parse(websitesJson || "[]") as string[];
 
     if (enrichmentColumns.length === 0) {
