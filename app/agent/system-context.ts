@@ -53,6 +53,8 @@ export class SystemContext {
   constructor(row: Record<string, string>, headers: string[]) {
     this.row = row;
     this.headers = headers;
+    console.log(`[CONTEXT] Initialized with ${headers.length} columns`);
+    console.log(`[CONTEXT] Missing columns: ${this.getMissingColumns().join(', ')}`);
   }
 
   getRow(): Record<string, string> {
@@ -77,6 +79,7 @@ export class SystemContext {
 
   reportSearch(search: SearchHistoryEntry): void {
     this.searchHistory.push(search);
+    console.log(`[CONTEXT] Tracking query: "${search.query}" (${search.results.length} results)`);
   }
 
   getSearchHistory(): SearchHistoryEntry[] {
@@ -131,6 +134,10 @@ export class SystemContext {
    * Update the row with new extracted data
    */
   updateRow(newData: Record<string, string>): void {
+    const filledColumns = Object.keys(newData).filter(key => newData[key] && newData[key].trim() !== '' && newData[key] !== '-');
+    if (filledColumns.length > 0) {
+      console.log(`[CONTEXT] Recording successful fills for: ${filledColumns.join(', ')}`);
+    }
     Object.assign(this.row, newData);
   }
 

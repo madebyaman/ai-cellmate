@@ -122,9 +122,11 @@ export const bulkCrawlWebsites = async (
   const scrapingBeeSemaphore = new Semaphore(concurrency);
 
   const crawlWebsite = async (
-    options: CrawlOptions & { url: string },
+    options: CrawlOptions & { url: string; index: number; total: number },
   ): Promise<CrawlResponse> => {
-    const { url } = options;
+    const { url, index, total } = options;
+
+    console.log(`[SCRAPING] [${index}/${total}] ${url}`);
 
     await scrapingBeeSemaphore.acquire();
 
@@ -136,6 +138,7 @@ export const bulkCrawlWebsites = async (
         if (response.ok) {
           const html = await response.text();
           const { content, links } = extractArticleText(html);
+          console.log(`[SCRAPING] [${index}/${total}] SUCCESS: ${content.length} chars scraped`);
           return {
             success: true,
             data: content,
@@ -144,7 +147,7 @@ export const bulkCrawlWebsites = async (
         }
       } catch (customError) {
         // Custom scraper failed, fall back to ScrapingBee
-        console.log(`Custom scraper failed for ${url}, falling back to ScrapingBee:`, customError);
+        console.log(`[SCRAPING] [${index}/${total}] FAILED: ${customError instanceof Error ? customError.message : 'Unknown error'}, trying ScrapingBee`);
       }
 
       // Fallback to ScrapingBee
@@ -155,6 +158,7 @@ export const bulkCrawlWebsites = async (
       const response = await fetch(scrapingBeeUrl.toString());
 
       if (!response.ok) {
+        console.log(`[SCRAPING] [${index}/${total}] ScrapingBee FAILED: ${response.status} ${response.statusText}`);
         return {
           success: false,
           error: `Failed to fetch website: ${response.status} ${response.statusText}`,
@@ -163,12 +167,14 @@ export const bulkCrawlWebsites = async (
 
       const html = await response.text();
       const { content, links } = extractArticleText(html);
+      console.log(`[SCRAPING] [${index}/${total}] ScrapingBee SUCCESS: ${content.length} chars scraped`);
       return {
         success: true,
         data: content,
         links,
       };
     } catch (error) {
+      console.log(`[SCRAPING] [${index}/${total}] ScrapingBee FAILED: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return {
         success: false,
         error: `Network error: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -179,8 +185,8 @@ export const bulkCrawlWebsites = async (
   };
 
   const results = await Promise.all(
-    urls.map(async (url) => {
-      const result = await crawlWebsite({ url });
+    urls.map(async (url, index) => {
+      const result = await crawlWebsite({ url, index: index + 1, total: urls.length });
       return {
         url,
         result,
@@ -194,6 +200,8 @@ export const bulkCrawlWebsites = async (
   const successCount = successfulResults.length;
   const failureCount = failedResults.length;
   const totalCount = results.length;
+
+  console.log(`[SCRAPING] Completed: ${successCount}/${totalCount} successful`);
 
   // All successful
   if (successCount === totalCount) {

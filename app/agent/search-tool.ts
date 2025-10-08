@@ -90,5 +90,7 @@ export const searchSerper = async (
     signal,
   });
 
+  console.log(`[SEARCH RESULT] Query "${body.q}" → ${results.organic.length} results`);
+
   return results;
 };
