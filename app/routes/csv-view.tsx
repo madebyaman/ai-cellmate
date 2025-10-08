@@ -1,4 +1,13 @@
-import { CheckCircle, Download, FileText, Info, Loader, Trash2, X } from "lucide-react";
+import {
+  CheckCircle,
+  Download,
+  FileText,
+  Info,
+  Loader,
+  Loader2,
+  Trash2,
+  X,
+} from "lucide-react";
 import { useEffect, useState } from "react";
 import {
   type ActionFunctionArgs,
@@ -9,12 +18,17 @@ import {
   useLoaderData,
 } from "react-router";
 import { useEventSource } from "remix-utils/sse/react";
-import { AgentLogsDrawer } from "~/components/agent-logs-drawer";
 import { AIEnrichmentModal } from "~/components/ai-enrichment-modal";
 import { CSVDetailsModal } from "~/components/csv-details-modal";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "~/components/accordion";
 import { deleteTable, getTableWithCachedData } from "~/lib/table.server";
 import {
   getActiveOrganizationId,
@@ -98,17 +112,25 @@ export default function CSVView() {
   const [showAIModal, setShowAIModal] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [logs, setLogs] = useState<
-    Array<{ message: string; timestamp: string; type: string }>
-  >([]);
   const [progress, setProgress] = useState(0);
   const [enrichedCells, setEnrichedCells] = useState<
     Record<string, Record<string, string>>
   >({});
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
-  const [showLogsDrawer, setShowLogsDrawer] = useState(false);
   const [hasShownSuccessToast, setHasShownSuccessToast] = useState(false);
-  const [highlightedCells, setHighlightedCells] = useState<Set<string>>(new Set());
+  const [highlightedCells, setHighlightedCells] = useState<Set<string>>(
+    new Set(),
+  );
+  const [currentRowMessage, setCurrentRowMessage] = useState<string>("");
+  const [stages, setStages] = useState<
+    Array<{ name: string; status: "pending" | "in-progress" | "completed" }>
+  >([
+    { name: "Searching data", status: "pending" },
+    { name: "Scraping", status: "pending" },
+    { name: "Parsing", status: "pending" },
+    { name: "Lookups", status: "pending" },
+    { name: "Saving", status: "pending" },
+  ]);
 
   // Get enrichment state from runs data
   const getEnrichmentState = () => {
@@ -139,20 +161,36 @@ export default function CSVView() {
 
     try {
       const eventData = JSON.parse(updateEvent);
-      const timestamp = eventData.timestamp;
 
       switch (eventData.type) {
         case "row-start":
           setProcessingRowId(eventData.rowId);
-          setLogs((prev) => [
-            ...prev,
-            {
-              message: `Profile Agent: Gathering company details`,
-              timestamp,
-              type: "row-start",
-            },
-          ]);
+          setCurrentRowMessage(eventData.message || "");
           setProgress(eventData.progress || 0);
+          // Stages are already reset by row-complete handler
+          break;
+
+        case "stage-start":
+          setStages((prev) =>
+            prev.map((stage) =>
+              stage.name === eventData.stage
+                ? { ...stage, status: "in-progress" }
+                : stage,
+            ),
+          );
+          if (eventData.message) {
+            setCurrentRowMessage(eventData.message);
+          }
+          break;
+
+        case "stage-complete":
+          setStages((prev) =>
+            prev.map((stage) =>
+              stage.name === eventData.stage
+                ? { ...stage, status: "completed" }
+                : stage,
+            ),
+          );
           break;
 
         case "row-complete":
@@ -167,7 +205,7 @@ export default function CSVView() {
                 rowCells[cell.columnId] = cell.value;
                 // Add to highlighted cells
                 newHighlightedCells.add(`${eventData.rowId}-${cell.columnId}`);
-              }
+              },
             );
 
             // Temporarily highlight cells
@@ -183,41 +221,37 @@ export default function CSVView() {
               [eventData.rowId]: rowCells,
             };
           });
-          setLogs((prev) => [
-            ...prev,
-            {
-              message: `Row ${eventData.rowPosition} enrichment complete`,
-              timestamp,
-              type: "row-complete",
-            },
-          ]);
           setProgress(eventData.progress || 0);
+
+          // Mark all stages as completed for visual feedback
+          setStages((prev) =>
+            prev.map((stage) => ({ ...stage, status: "completed" })),
+          );
+
+          // Reset stages to pending after 800ms to show visual separation before next row
+          setTimeout(() => {
+            setStages([
+              { name: "Searching data", status: "pending" },
+              { name: "Scraping", status: "pending" },
+              { name: "Parsing", status: "pending" },
+              { name: "Lookups", status: "pending" },
+              { name: "Saving", status: "pending" },
+            ]);
+          }, 800);
           break;
 
         case "row-skipped":
           setProcessingRowId(null);
-          setLogs((prev) => [
-            ...prev,
-            {
-              message: `Row ${eventData.rowPosition} skipped (already complete)`,
-              timestamp,
-              type: "row-skipped",
-            },
-          ]);
           setProgress(eventData.progress || 0);
           break;
 
         case "complete":
           setProcessingRowId(null);
-          setLogs((prev) => [
-            ...prev,
-            {
-              message: "Enrichment complete!",
-              timestamp,
-              type: "complete",
-            },
-          ]);
           setProgress(100);
+          // Mark all stages as completed
+          setStages((prev) =>
+            prev.map((stage) => ({ ...stage, status: "completed" })),
+          );
 
           // Show success toast only once
           if (!hasShownSuccessToast) {
@@ -231,7 +265,7 @@ export default function CSVView() {
     } catch (e) {
       console.error("Failed to parse event:", e);
     }
-  }, [updateEvent]);
+  }, [updateEvent, hasShownSuccessToast]);
 
   const getEnrichmentDetails = () => {
     const latestRun = cachedData.runs[0];
@@ -253,7 +287,10 @@ export default function CSVView() {
       websitesScraped: cachedData.hint?.websites || [],
       processedCells: filledCells,
       totalCells: totalCells,
-      completedAt: latestRun ? new Date(latestRun.finishedAt) : new Date(),
+      completedAt:
+        latestRun && latestRun.finishedAt
+          ? new Date(latestRun.finishedAt)
+          : new Date(),
     };
   };
 
@@ -272,10 +309,9 @@ export default function CSVView() {
 
   return (
     <LayoutWrapper
-      className="flex flex-col h-full overflow-auto"
+      className="flex flex-col h-full overflow-auto pt-2"
       outerContainerClass="overflow-auto"
     >
-      {/* Header - Supabase style but light */}
       <div className="flex items-center justify-between py-4 flex-shrink-0">
         <div className="flex items-center gap-4">
           <h1 className="text-lg font-semibold text-gray-900">
@@ -284,19 +320,16 @@ export default function CSVView() {
         </div>
 
         <div className="flex items-center gap-3">
-          {/* Show different buttons based on state */}
-          {enrichmentState !== "processing" && (
+          {/* Export Button - only show when completed */}
+          {enrichmentState === "completed" && (
             <>
-              {/* Export Button - only show when completed */}
-              {enrichmentState === "completed" && (
-                <Button
-                  variant="outline"
-                  className="text-gray-700 border-gray-300 hover:bg-gray-50"
-                >
-                  <Download className="w-4 h-4" />
-                  Export CSV
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                className="text-gray-700 border-gray-300 hover:bg-gray-50"
+              >
+                <Download className="w-4 h-4" />
+                Export CSV
+              </Button>
 
               <Button
                 variant="outline"
@@ -314,45 +347,27 @@ export default function CSVView() {
       {/* Enrichment Progress Panel - Show when processing */}
       {enrichmentState === "processing" && (
         <div className="mb-4">
-          <div
-            className={`flex items-start justify-between rounded-lg p-4 ${
-              progress === 100
-                ? "bg-green-50 border border-green-200"
-                : "bg-orange-50 border border-orange-200"
-            }`}
-          >
-            <div className="flex items-start gap-3">
-              {progress === 100 ? (
-                <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
-              ) : (
-                <Loader className="w-5 h-5 text-orange-500 animate-spin mt-0.5" />
-              )}
-              <div>
-                <div className="font-semibold text-gray-900 mb-1">
-                  {progress === 100 ? "Enrichment Complete" : "Enriching Data"}
-                </div>
-                <div className="text-sm text-gray-600">
-                  {Math.round((progress / 100) * cachedData.rows.length)} of{" "}
-                  {cachedData.rows.length} rows processed
-                </div>
-                {progress < 100 && (
-                  <div className="text-sm text-gray-500 mt-0.5">
-                    Currently processing row{" "}
-                    {Math.ceil((progress / 100) * cachedData.rows.length)}
-                  </div>
+          <div className={`rounded-lg p-4 bg-white border border-gray-200`}>
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex items-start gap-3">
+                {progress === 100 ? (
+                  <CheckCircle className="w-5 h-5 text-green-600 mt-0.5" />
+                ) : (
+                  <Loader2 className="w-5 h-5 text-gray-500 animate-spin mt-0.5" />
                 )}
+                <div>
+                  <div className="font-semibold text-normal text-gray-900 mb-1">
+                    {progress === 100
+                      ? "Enrichment Complete"
+                      : "Enriching Data"}
+                  </div>
+                  <div className="text-sm text-gray-600">
+                    {progress === 100
+                      ? `${cachedData.rows.length} of ${cachedData.rows.length} rows processed`
+                      : `Processing row ${Math.round((progress / 100) * cachedData.rows.length)} of ${cachedData.rows.length}`}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-gray-700 border-gray-300 hover:bg-gray-50"
-                onClick={() => setShowLogsDrawer(true)}
-              >
-                <FileText className="w-4 h-4" />
-                View Logs
-              </Button>
               {progress < 100 && (
                 <Button
                   variant="outline"
@@ -367,6 +382,50 @@ export default function CSVView() {
                 </Button>
               )}
             </div>
+
+            {/* Progress Bar */}
+            <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+              <div
+                className={
+                  "h-1.5 rounded-full transition-all duration-300 bg-gray-500"
+                }
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+
+            {/* Stage Logs Accordion */}
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="stage-logs" className="border-none">
+                <AccordionTrigger className="text-xs text-gray-600 hover:no-underline py-2">
+                  View logs
+                </AccordionTrigger>
+                <AccordionContent>
+                  <div className="space-y-2 rounded border border-gray-200 bg-gray-50 p-2">
+                    {stages.map((stage, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center gap-2 text-xs font-mono leading-5"
+                      >
+                        <span
+                          className={
+                            stage.status === "in-progress"
+                              ? "text-gray-900"
+                              : "text-gray-400"
+                          }
+                        >
+                          {stage.status === "completed"
+                            ? "[✓]"
+                            : stage.status === "in-progress"
+                              ? "[…]"
+                              : "[ ]"}{" "}
+                          {stage.name}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
           </div>
         </div>
       )}
@@ -492,12 +551,6 @@ export default function CSVView() {
         processedCells={enrichmentDetails.processedCells}
         totalCells={enrichmentDetails.totalCells}
         status={status}
-      />
-
-      <AgentLogsDrawer
-        isOpen={showLogsDrawer}
-        onClose={() => setShowLogsDrawer(false)}
-        logs={logs}
       />
 
       {/* Delete Confirmation Modal */}
