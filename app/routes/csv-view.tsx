@@ -33,7 +33,6 @@ import {
 import { INTENTS, ROUTES } from "~/utils/constants";
 import { redirectWithToast } from "~/utils/toast.server";
 import { cancelEnrichment } from "~/lib/enrichment-cancellation.server";
-import { exportTableToCSV } from "~/lib/csv-export.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const tableId = params.tableId;
@@ -102,34 +101,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
       console.error("Error cancelling enrichment:", error);
       return data(
         { success: false, error: "Failed to cancel enrichment" },
-        { status: 500 }
-      );
-    }
-  }
-
-  if (intent === INTENTS.EXPORT_CSV) {
-    try {
-      const result = await exportTableToCSV(tableId, activeOrg.id);
-
-      if (result.success && result.csv && result.filename) {
-        // Return CSV as downloadable file
-        return new Response(result.csv, {
-          status: 200,
-          headers: {
-            "Content-Type": "text/csv",
-            "Content-Disposition": `attachment; filename="${result.filename}"`,
-          },
-        });
-      } else {
-        return data(
-          { success: false, error: result.error || "Export failed" },
-          { status: 400 }
-        );
-      }
-    } catch (error) {
-      console.error("Error exporting CSV:", error);
-      return data(
-        { success: false, error: "Failed to export CSV" },
         { status: 500 }
       );
     }
@@ -400,7 +371,52 @@ export default function CSVView() {
   };
 
   const handleExportCSV = () => {
-    fetcher.submit({ intent: INTENTS.EXPORT_CSV }, { method: "POST" });
+    try {
+      // Build CSV from current table data
+      const headers = cachedData.columns.map((col) => col.name);
+      const csvRows = [headers.join(",")];
+
+      cachedData.rows.forEach((row) => {
+        const rowValues = cachedData.columns.map((column) => {
+          // Get cell value (same logic as display)
+          const enrichedValue = enrichedCells[row.id]?.[column.id];
+          if (enrichedValue) {
+            return `"${enrichedValue.replace(/"/g, '""')}"`;
+          }
+
+          const cell = row.cells.find((c) => c.columnId === column.id);
+          if (!cell || cell.versions.length === 0) return '""';
+
+          const pickedVersion = cell.versions.find((v) => v.picked);
+          const currentVersion = pickedVersion || cell.versions[0];
+          const value = currentVersion?.value || "";
+          return `"${value.replace(/"/g, '""')}"`;
+        });
+        csvRows.push(rowValues.join(","));
+      });
+
+      const csvContent = csvRows.join("\n");
+
+      // Create blob and download
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${cachedData.name}.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success("Export successful", {
+        description: "Your CSV file has been downloaded.",
+      });
+    } catch (error) {
+      console.error("Export error:", error);
+      toast.error("Export failed", {
+        description: "An error occurred while exporting the CSV.",
+      });
+    }
   };
 
   return (
@@ -423,10 +439,9 @@ export default function CSVView() {
                 variant="outline"
                 className="text-gray-700 border-gray-300 hover:bg-gray-50"
                 onClick={handleExportCSV}
-                disabled={fetcher.state === "submitting"}
               >
                 <Download className="w-4 h-4" />
-                {fetcher.state === "submitting" ? "Exporting..." : "Export CSV"}
+                Export CSV
               </Button>
 
               <Button

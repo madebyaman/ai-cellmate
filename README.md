@@ -45,7 +45,7 @@ so basically it is calling 4-5 searches at parallel. Each search yields a list o
 - [-] when enrichment complete, get the full table. Or refresh the page implicitly.
 - [] Export button (verify)
 - [x] Row shouldn't highlight once they fill
-- [] Make cancel button work (verify)
+- [x] Make cancel button work (verify)
 - [-] Clearing redis entries after successful completion
 - [x] Processing starts from 0 and finishes 1 before and continues in loading
 - [x] retrying row event clear all the stages.
