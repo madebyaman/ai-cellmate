@@ -1,14 +1,5 @@
-import {
-  CheckCircle,
-  Download,
-  FileText,
-  Info,
-  Loader,
-  Loader2,
-  Trash2,
-  X,
-} from "lucide-react";
-import { useEffect, useState } from "react";
+import { CheckCircle, Download, Loader2, Trash2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import {
   type ActionFunctionArgs,
   data,
@@ -18,8 +9,6 @@ import {
   useLoaderData,
 } from "react-router";
 import { useEventSource } from "remix-utils/sse/react";
-import { AIEnrichmentModal } from "~/components/ai-enrichment-modal";
-import { CSVDetailsModal } from "~/components/csv-details-modal";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
@@ -109,19 +98,20 @@ export async function action({ request, params }: ActionFunctionArgs) {
 export default function CSVView() {
   const { table, cachedData, status } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
-  const [showAIModal, setShowAIModal] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [progress, setProgress] = useState(0);
   const [enrichedCells, setEnrichedCells] = useState<
     Record<string, Record<string, string>>
   >({});
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
-  const [hasShownSuccessToast, setHasShownSuccessToast] = useState(false);
-  const [highlightedCells, setHighlightedCells] = useState<Set<string>>(
+  const [completedRowIds, setCompletedRowIds] = useState<Set<string>>(
     new Set(),
   );
-  const [currentRowMessage, setCurrentRowMessage] = useState<string>("");
+  const hasShownSuccessToastRef = useRef(false);
+  const totalRows = cachedData.rows.length;
+
+  // Derived states
+  const completedRows = completedRowIds.size;
+  const progress = Math.round((completedRows / totalRows) * 100);
   const [stages, setStages] = useState<
     Array<{ name: string; status: "pending" | "in-progress" | "completed" }>
   >([
@@ -165,9 +155,7 @@ export default function CSVView() {
       switch (eventData.type) {
         case "row-start":
           setProcessingRowId(eventData.rowId);
-          setCurrentRowMessage(eventData.message || "");
-          setProgress(eventData.progress || 0);
-          // Stages are already reset by row-complete handler
+          // should reset the stages?
           break;
 
         case "stage-start":
@@ -178,9 +166,6 @@ export default function CSVView() {
                 : stage,
             ),
           );
-          if (eventData.message) {
-            setCurrentRowMessage(eventData.message);
-          }
           break;
 
         case "stage-complete":
@@ -193,35 +178,24 @@ export default function CSVView() {
           );
           break;
 
-        case "row-complete":
-          setProcessingRowId(null);
-          // Update enriched cells for this row
+        case "cell-update":
+          // Update individual cell in real-time
           setEnrichedCells((prev) => {
-            const rowCells: Record<string, string> = {};
-            const newHighlightedCells = new Set<string>();
-
-            eventData.cells.forEach(
-              (cell: { columnId: string; value: string }) => {
-                rowCells[cell.columnId] = cell.value;
-                // Add to highlighted cells
-                newHighlightedCells.add(`${eventData.rowId}-${cell.columnId}`);
-              },
-            );
-
-            // Temporarily highlight cells
-            setHighlightedCells(newHighlightedCells);
-
-            // Remove highlight after 2 seconds
-            setTimeout(() => {
-              setHighlightedCells(new Set());
-            }, 2000);
-
+            const rowCells = prev[eventData.rowId] || {};
             return {
               ...prev,
-              [eventData.rowId]: rowCells,
+              [eventData.rowId]: {
+                ...rowCells,
+                [eventData.columnId]: eventData.value,
+              },
             };
           });
-          setProgress(eventData.progress || 0);
+          break;
+
+        case "row-complete":
+          setProcessingRowId(null);
+          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+          // Don't think we should reset or mark stages as completed. Should be handled by other events
 
           // Mark all stages as completed for visual feedback
           setStages((prev) =>
@@ -237,25 +211,66 @@ export default function CSVView() {
               { name: "Lookups", status: "pending" },
               { name: "Saving", status: "pending" },
             ]);
-          }, 800);
+          }, 100);
+          break;
+
+        case "row-retrying":
+          // we should get which row is retrying. And mark all stages as pending. But check if after row-retrying we send row-state event. If so, mark all stages as pending will be done by row-start
+          setProcessingRowId(null);
+
+          // Mark all stages as completed
+          setStages((prev) =>
+            prev.map((stage) => ({ ...stage, status: "completed" })),
+          );
+
+          // Reset stages immediately for cycle 2
+          setTimeout(() => {
+            setStages([
+              { name: "Searching data", status: "pending" },
+              { name: "Scraping", status: "pending" },
+              { name: "Parsing", status: "pending" },
+              { name: "Lookups", status: "pending" },
+              { name: "Saving", status: "pending" },
+            ]);
+          }, 100);
+          break;
+
+        case "row-failed":
+          setProcessingRowId(null);
+          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId)); // Count failed rows as completed for progress
+
+          // Mark all stages as completed (some may have been completed before failure)
+          setStages((prev) =>
+            prev.map((stage) => ({ ...stage, status: "completed" })),
+          );
+
+          // Reset stages to pending after 800ms
+          setTimeout(() => {
+            setStages([
+              { name: "Searching data", status: "pending" },
+              { name: "Scraping", status: "pending" },
+              { name: "Parsing", status: "pending" },
+              { name: "Lookups", status: "pending" },
+              { name: "Saving", status: "pending" },
+            ]);
+          }, 100);
           break;
 
         case "row-skipped":
           setProcessingRowId(null);
-          setProgress(eventData.progress || 0);
+          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId)); // Count skipped rows as completed for progress
           break;
 
         case "complete":
           setProcessingRowId(null);
-          setProgress(100);
           // Mark all stages as completed
           setStages((prev) =>
             prev.map((stage) => ({ ...stage, status: "completed" })),
           );
 
           // Show success toast only once
-          if (!hasShownSuccessToast) {
-            setHasShownSuccessToast(true);
+          if (!hasShownSuccessToastRef.current) {
+            hasShownSuccessToastRef.current = true;
             toast.success("Enrichment completed successfully!", {
               description: "All rows have been processed.",
             });
@@ -265,42 +280,7 @@ export default function CSVView() {
     } catch (e) {
       console.error("Failed to parse event:", e);
     }
-  }, [updateEvent, hasShownSuccessToast]);
-
-  const getEnrichmentDetails = () => {
-    const latestRun = cachedData.runs[0];
-    const totalCells = cachedData.rows.reduce(
-      (acc, row) => acc + row.cells.length,
-      0,
-    );
-    const filledCells = cachedData.rows.reduce((acc, row) => {
-      return (
-        acc +
-        row.cells.filter((cell) =>
-          cell.versions.some((v) => v.picked && v.value),
-        ).length
-      );
-    }, 0);
-
-    return {
-      prompt: cachedData.hint?.prompt || "No enrichment prompt set",
-      websitesScraped: cachedData.hint?.websites || [],
-      processedCells: filledCells,
-      totalCells: totalCells,
-      completedAt:
-        latestRun && latestRun.finishedAt
-          ? new Date(latestRun.finishedAt)
-          : new Date(),
-    };
-  };
-
-  const [enrichmentDetails] = useState(getEnrichmentDetails());
-
-  const handleEnrichData = (e) => {
-    e.preventDefault();
-    console.log("showing ai modal");
-    setShowAIModal(true);
-  };
+  }, [updateEvent]);
 
   const handleDeleteTable = () => {
     fetcher.submit({ intent: "delete-table" }, { method: "POST" });
@@ -481,9 +461,6 @@ export default function CSVView() {
                   </td>
                   {cachedData.columns.map((column) => {
                     const cellValue = getCellValue(column.id);
-                    const isEnriched = !!enrichedCells[row.id]?.[column.id];
-                    const cellKey = `${row.id}-${column.id}`;
-                    const isHighlighted = highlightedCells.has(cellKey);
                     const isUrl =
                       cellValue &&
                       (cellValue.startsWith("http") || cellValue.includes("@"));
@@ -491,9 +468,7 @@ export default function CSVView() {
                     return (
                       <td
                         key={column.id}
-                        className={`px-4 py-3 text-sm border-l border-gray-200 transition-colors duration-500 ${
-                          isHighlighted ? "bg-green-100" : ""
-                        }`}
+                        className="px-4 py-3 text-sm border-l border-gray-200"
                       >
                         {cellValue ? (
                           isUrl ? (
@@ -534,24 +509,6 @@ export default function CSVView() {
           </tbody>
         </table>
       </div>
-
-      <AIEnrichmentModal
-        isOpen={showAIModal}
-        onClose={() => setShowAIModal(false)}
-        selectedRows={[]}
-        totalRows={cachedData.rows.length}
-      />
-
-      <CSVDetailsModal
-        isOpen={showDetails}
-        onClose={() => setShowDetails(false)}
-        tableName={cachedData.name}
-        runs={cachedData.runs || []}
-        hint={cachedData.hint}
-        processedCells={enrichmentDetails.processedCells}
-        totalCells={enrichmentDetails.totalCells}
-        status={status}
-      />
 
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
