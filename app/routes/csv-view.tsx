@@ -8,7 +8,7 @@ import {
   useFetcher,
   useLoaderData,
 } from "react-router";
-import { useEventSource } from "remix-utils/sse/react";
+import { useEventSource } from "~/hooks/useEventSource";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
