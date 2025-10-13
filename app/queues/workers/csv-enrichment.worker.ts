@@ -12,6 +12,8 @@ import { LangfuseExporter } from "langfuse-vercel";
 import { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 import { prisma } from "~/lib/prisma.server";
 import { updateCachedTable } from "~/lib/cached-table.server";
+import { publishEnrichmentEvent } from "~/lib/redis-event-publisher";
+import { createEnrichmentEvent } from "~/lib/enrichment-events";
 
 const langfuse = new Langfuse({
   environment: process.env.NODE_ENV ?? "development",
@@ -175,6 +177,15 @@ async function processCsvEnrichment(
         `[ROW ${i + 1}/${run.table.rows.length}] Websites: ${websites.join(", ") || "none"}`,
       );
 
+      // Emit row-start event
+      await publishEnrichmentEvent(
+        run.table.id,
+        createEnrichmentEvent("row-start", {
+          rowId: row.id,
+          rowPosition: row.position,
+        })
+      );
+
       const rowTrace = langfuse.trace({
         sessionId: userId,
         name: `enrich-row-${i + 1}`,
@@ -187,7 +198,7 @@ async function processCsvEnrichment(
       });
 
       try {
-        // Run agent loop
+        // Run agent loop with tableId for event emission
         const agentResult = await runAgentLoop({
           row: rowContext,
           headers: enrichmentColumnNames,
@@ -195,6 +206,11 @@ async function processCsvEnrichment(
           langfuseTraceId: rowTrace.id,
           prompt: enrichmentPrompt,
           websites: websites,
+          tableId: run.table.id,
+          rowId: row.id,
+          rowPosition: row.position,
+          currentRowIndex: i,
+          totalRows: run.table.rows.length,
         });
 
         console.log(
@@ -214,7 +230,15 @@ async function processCsvEnrichment(
           `[ROW ${i + 1}/${run.table.rows.length}] Filled: ${filledCount}/${enrichmentColumnNames.length} columns`,
         );
 
-        // Create CellVersions for enriched data
+        // Emit stage-start for "Saving"
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("stage-start", {
+            stage: "Saving",
+          })
+        );
+
+        // Create CellVersions for enriched data and emit cell-update events
         for (const enrichmentCol of enrichmentColumns) {
           const value = agentResult.enrichedRow[enrichmentCol.name];
           if (value && value.trim() !== "" && value !== "-") {
@@ -233,9 +257,39 @@ async function processCsvEnrichment(
               console.log(
                 `[CELL VERSION] Created for ${enrichmentCol.name}: "${value.substring(0, 50)}..."`,
               );
+
+              // Emit cell-update event
+              await publishEnrichmentEvent(
+                run.table.id,
+                createEnrichmentEvent("cell-update", {
+                  rowId: row.id,
+                  columnId: enrichmentCol.id,
+                  columnName: enrichmentCol.name,
+                  value: value,
+                })
+              );
             }
           }
         }
+
+        // Emit stage-complete for "Saving"
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("stage-complete", {
+            stage: "Saving",
+          })
+        );
+
+        // Emit row-complete event
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("row-complete", {
+            rowId: row.id,
+            rowPosition: row.position,
+            columnsFilled: filledCount,
+            columnsTotal: enrichmentColumnNames.length,
+          })
+        );
 
         rowTrace.update({
           output: {
@@ -249,6 +303,17 @@ async function processCsvEnrichment(
           `[ROW ${i + 1}/${run.table.rows.length}] ERROR:`,
           error,
         );
+
+        // Emit row-failed event
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("row-failed", {
+            rowId: row.id,
+            rowPosition: row.position,
+            reason: error instanceof Error ? error.message : "Unknown error",
+          })
+        );
+
         rowTrace.update({
           metadata: { error: error instanceof Error ? error.message : "Unknown error" },
         });
@@ -266,6 +331,12 @@ async function processCsvEnrichment(
     console.log(`[CACHE UPDATE] Regenerating cached table...`);
     await updateCachedTable(run.table.id);
     console.log(`[CACHE UPDATED] Table ${run.table.id}`);
+
+    // 8. Emit complete event
+    await publishEnrichmentEvent(
+      run.table.id,
+      createEnrichmentEvent("complete", {})
+    );
 
     await sdk.shutdown();
 

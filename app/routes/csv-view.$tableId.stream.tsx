@@ -3,6 +3,7 @@ import { eventStream } from "remix-utils/sse/server";
 import { UNSAFE_invariant } from "react-router";
 import { requireActiveOrg } from "~/utils/auth.server";
 import { getTableWithCachedData } from "~/lib/table.server";
+import IORedis from "ioredis";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const tableId = params.tableId;
@@ -25,128 +26,68 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   }
 
   return eventStream(request.signal, function setup(send) {
-    const rows = tableData.cachedData.rows;
-    const totalRows = rows.length;
+    console.log(`[SSE] Client connected for table ${tableId}`);
 
-    const stages = [
-      { name: "Searching data", duration: 1000 },
-      { name: "Scraping", duration: 1200, message: "Scraping google.com" },
-      { name: "Parsing", duration: 800 },
-      { name: "Lookups", duration: 900 },
-      { name: "Saving", duration: 800 },
-    ];
+    // Create Redis subscriber client
+    const subscriber = process.env.REDIS_URL
+      ? new IORedis(process.env.REDIS_URL + "?family=0", {
+          maxRetriesPerRequest: null,
+        })
+      : new IORedis({
+          host: process.env.REDIS_HOST || "localhost",
+          port: parseInt(process.env.REDIS_PORT || "6379"),
+          password: process.env.REDIS_PASSWORD,
+          maxRetriesPerRequest: null,
+        });
 
-    let cancelled = false;
+    const channel = `enrichment:${tableId}`;
 
-    async function processAllRows() {
-      for (let currentRowIndex = 0; currentRowIndex < totalRows; currentRowIndex++) {
-        if (cancelled) break;
+    // Subscribe to Redis channel
+    subscriber.subscribe(channel, (err) => {
+      if (err) {
+        console.error(`[SSE] Failed to subscribe to ${channel}:`, err);
+      } else {
+        console.log(`[SSE] Subscribed to ${channel}`);
+      }
+    });
 
-        const row = rows[currentRowIndex];
-        const shouldSkip = Math.random() < 0.2; // 20% chance to skip
+    // Handle incoming messages from Redis
+    subscriber.on("message", (receivedChannel, message) => {
+      if (receivedChannel === channel) {
+        try {
+          // Parse and validate the message
+          const event = JSON.parse(message);
 
-        if (shouldSkip) {
-          // Send row-skipped event
-          send({
-            event: "update",
-            data: JSON.stringify({
-              type: "row-skipped",
-              rowId: row.id,
-              rowPosition: row.position,
-              timestamp: new Date().toISOString(),
-              progress: Math.round(((currentRowIndex + 1) / totalRows) * 100),
-            }),
-          });
-        } else {
-          // Send row-start event
-          send({
-            event: "update",
-            data: JSON.stringify({
-              type: "row-start",
-              rowId: row.id,
-              rowPosition: row.position,
-              message: `processing row ${row.position}: ${stages[0].message || stages[0].name}`,
-              timestamp: new Date().toISOString(),
-              progress: Math.round((currentRowIndex / totalRows) * 100),
-            }),
-          });
-
-          // Process each stage sequentially
-          for (const stage of stages) {
-            if (cancelled) break;
-
-            // Send stage-start
-            send({
-              event: "update",
-              data: JSON.stringify({
-                type: "stage-start",
-                stage: stage.name,
-                message: stage.message
-                  ? `processing row ${row.position}: ${stage.message}`
-                  : undefined,
-                timestamp: new Date().toISOString(),
-              }),
-            });
-
-            // Wait for stage duration
-            await new Promise((resolve) => setTimeout(resolve, stage.duration));
-
-            // Send stage-complete
-            send({
-              event: "update",
-              data: JSON.stringify({
-                type: "stage-complete",
-                stage: stage.name,
-                timestamp: new Date().toISOString(),
-              }),
-            });
-
-            // Wait 200ms to ensure stage completion is rendered
-            await new Promise((resolve) => setTimeout(resolve, 200));
+          // Log important events
+          if (
+            ["row-start", "row-complete", "row-retrying", "row-failed", "complete"].includes(
+              event.type
+            )
+          ) {
+            console.log(`[SSE] Forwarding ${event.type} to client`);
           }
 
-          // All stages complete, send row-complete with enriched data
-          const enrichedCells = tableData.cachedData.columns.map((column) => ({
-            columnId: column.id,
-            columnName: column.name,
-            value: `Enriched data for ${column.name} - Row ${row.position}`,
-          }));
-
+          // Send event to client
           send({
             event: "update",
-            data: JSON.stringify({
-              type: "row-complete",
-              rowId: row.id,
-              rowPosition: row.position,
-              cells: enrichedCells,
-              timestamp: new Date().toISOString(),
-              progress: Math.round(((currentRowIndex + 1) / totalRows) * 100),
-            }),
+            data: message, // Send the raw JSON string
           });
+        } catch (error) {
+          console.error("[SSE] Failed to parse message:", error);
         }
-
-        // Wait before next row to allow UI to show completion and reset
-        await new Promise((resolve) => setTimeout(resolve, 1500));
       }
+    });
 
-      // Send completion event
-      if (!cancelled) {
-        send({
-          event: "update",
-          data: JSON.stringify({
-            type: "complete",
-            timestamp: new Date().toISOString(),
-            progress: 100,
-          }),
-        });
-      }
-    }
+    // Handle Redis errors
+    subscriber.on("error", (error) => {
+      console.error("[SSE] Redis subscriber error:", error);
+    });
 
-    // Start processing rows
-    processAllRows();
-
-    return function clear() {
-      cancelled = true;
+    // Cleanup function when client disconnects
+    return function cleanup() {
+      console.log(`[SSE] Client disconnected from table ${tableId}`);
+      subscriber.unsubscribe(channel);
+      subscriber.quit();
     };
   });
 }

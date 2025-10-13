@@ -3,6 +3,8 @@ import { queryRewriter } from "./query-writer";
 import { searchSerper } from "./search-tool";
 import { bulkCrawlWebsites } from "./scraper-tool";
 import { extractResultsFromCrawledData } from "./result-extracter";
+import { publishEnrichmentEvent } from "~/lib/redis-event-publisher";
+import { createEnrichmentEvent } from "~/lib/enrichment-events";
 
 interface AgentLoopOptions {
   row: Record<string, string>;
@@ -11,6 +13,11 @@ interface AgentLoopOptions {
   langfuseTraceId?: string;
   prompt?: string;
   websites?: string[];
+  tableId?: string;
+  rowId?: string;
+  rowPosition?: number;
+  currentRowIndex?: number;
+  totalRows?: number;
 }
 
 interface AgentLoopResult {
@@ -30,6 +37,11 @@ export const runAgentLoop = async (
     langfuseTraceId,
     prompt,
     websites = [],
+    tableId,
+    rowId,
+    rowPosition,
+    currentRowIndex,
+    totalRows,
   } = options;
 
   // Step 1: Prepare the system context
@@ -56,6 +68,16 @@ export const runAgentLoop = async (
     );
 
     try {
+      // Emit stage-start for "Searching data"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-start", {
+            stage: "Searching data",
+          })
+        );
+      }
+
       // Step 2: Generate search queries using query-writer
       console.log(`[CYCLE ${currentCycle + 1}] Generating search queries...`);
       const queryResult = await queryRewriter(
@@ -99,6 +121,16 @@ export const runAgentLoop = async (
 
       console.log(`[SEARCHING] Completed ${searchResults.length} searches`);
 
+      // Emit stage-complete for "Searching data"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-complete", {
+            stage: "Searching data",
+          })
+        );
+      }
+
       // Step 4: Collect all URLs and deduplicate
       const allUrls = new Set<string>();
 
@@ -129,6 +161,16 @@ export const runAgentLoop = async (
         break;
       }
 
+      // Emit stage-start for "Scraping"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-start", {
+            stage: "Scraping",
+          })
+        );
+      }
+
       // Step 6: Scrape the URLs
       console.log(
         `[SCRAPING] Starting ${urlsToScrape.length} parallel scrapes (concurrency: ${concurrency})`,
@@ -151,6 +193,42 @@ export const runAgentLoop = async (
         }`,
       );
 
+      // Emit stage-complete for "Scraping"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-complete", {
+            stage: "Scraping",
+          })
+        );
+      }
+
+      // Emit stage-start for "Parsing" (implicit in scraping, so complete immediately)
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-start", {
+            stage: "Parsing",
+          })
+        );
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-complete", {
+            stage: "Parsing",
+          })
+        );
+      }
+
+      // Emit stage-start for "Lookups"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-start", {
+            stage: "Lookups",
+          })
+        );
+      }
+
       // Step 7: Extract results from crawled data
       console.log(
         `[EXTRACTION] Analyzing ${crawlResults.success !== false ? crawlResults.results.filter((r) => r.success).length : 0} pages for data extraction`,
@@ -169,6 +247,16 @@ export const runAgentLoop = async (
       console.log(
         `[EXTRACTION] Found values for: ${extractedColumns.length > 0 ? extractedColumns.join(", ") : "none"}`,
       );
+
+      // Emit stage-complete for "Lookups"
+      if (tableId) {
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("stage-complete", {
+            stage: "Lookups",
+          })
+        );
+      }
 
       // Update the row with extracted data
       const newRowData: Record<string, string> = {};
@@ -192,6 +280,21 @@ export const runAgentLoop = async (
       if (context.isRowComplete()) {
         console.log(`[CYCLE ${currentCycle + 1}] Row is now complete!`);
         break;
+      }
+
+      // Check if we're about to enter cycle 2 (row-retrying event)
+      if (currentCycle === 0 && !context.isRowComplete() && tableId && rowId && rowPosition) {
+        const filledCount = headers.length - context.getMissingColumns().length;
+        await publishEnrichmentEvent(
+          tableId,
+          createEnrichmentEvent("row-retrying", {
+            rowId,
+            rowPosition,
+            columnsFilled: filledCount,
+            columnsTotal: headers.length,
+            cycle: 2,
+          })
+        );
       }
     } catch (error) {
       console.error(
