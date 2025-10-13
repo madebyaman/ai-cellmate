@@ -5,6 +5,7 @@ import { bulkCrawlWebsites } from "./scraper-tool";
 import { extractResultsFromCrawledData } from "./result-extracter";
 import { publishEnrichmentEvent } from "~/lib/redis-event-publisher";
 import { createEnrichmentEvent } from "~/lib/enrichment-events";
+import { checkCancellationFlag } from "~/lib/enrichment-cancellation.server";
 
 interface AgentLoopOptions {
   row: Record<string, string>;
@@ -18,6 +19,7 @@ interface AgentLoopOptions {
   rowPosition?: number;
   currentRowIndex?: number;
   totalRows?: number;
+  runId?: string;
 }
 
 interface AgentLoopResult {
@@ -42,6 +44,7 @@ export const runAgentLoop = async (
     rowPosition,
     currentRowIndex,
     totalRows,
+    runId,
   } = options;
 
   // Step 1: Prepare the system context
@@ -66,6 +69,15 @@ export const runAgentLoop = async (
     console.log(
       `[CYCLE ${currentCycle + 1}] Missing columns: ${context.getMissingColumns().join(", ")}`,
     );
+
+    // Check for cancellation before starting cycle
+    if (runId) {
+      const isCancelled = await checkCancellationFlag(runId);
+      if (isCancelled) {
+        console.log(`[AGENT LOOP] Cancellation detected for run ${runId}`);
+        throw new Error("Enrichment cancelled by user");
+      }
+    }
 
     try {
       // Emit stage-start for "Searching data"

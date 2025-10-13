@@ -71,6 +71,12 @@ export interface CompleteEvent {
   timestamp: string;
 }
 
+export interface CancelledEvent {
+  type: "cancelled";
+  reason: string;
+  timestamp: string;
+}
+
 export type EnrichmentEvent =
   | RowStartEvent
   | StageStartEvent
@@ -80,7 +86,8 @@ export type EnrichmentEvent =
   | RowRetryingEvent
   | RowFailedEvent
   | RowSkippedEvent
-  | CompleteEvent;
+  | CompleteEvent
+  | CancelledEvent;
 
 /**
  * Helper function to create enrichment events with timestamp

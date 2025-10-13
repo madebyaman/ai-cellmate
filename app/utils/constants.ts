@@ -20,6 +20,8 @@ export const INTENTS = {
   BUY_CREDITS: "buy-credits",
   INVITE_MEMBER: "invite-member",
   INTENT: "intent",
+  CANCEL_ENRICHMENT: "cancel-enrichment",
+  EXPORT_CSV: "export-csv",
 };
 
 export const CHANGE_WORKSPACE_FORM = {

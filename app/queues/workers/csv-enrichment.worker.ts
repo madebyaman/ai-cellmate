@@ -14,6 +14,7 @@ import { prisma } from "~/lib/prisma.server";
 import { updateCachedTable } from "~/lib/cached-table.server";
 import { publishEnrichmentEvent } from "~/lib/redis-event-publisher";
 import { createEnrichmentEvent } from "~/lib/enrichment-events";
+import { checkCancellationFlag, clearCancellationFlag } from "~/lib/enrichment-cancellation.server";
 
 const langfuse = new Langfuse({
   environment: process.env.NODE_ENV ?? "development",
@@ -125,6 +126,41 @@ async function processCsvEnrichment(
     // 5. Process each row
     for (let i = 0; i < run.table.rows.length; i++) {
       const row = run.table.rows[i];
+
+      // Check for cancellation before processing each row
+      const isCancelled = await checkCancellationFlag(runId);
+      if (isCancelled) {
+        console.log(`[CANCELLATION] Detected for run ${runId}, stopping enrichment`);
+
+        // Update Run status to CANCELLED
+        await prisma.run.update({
+          where: { id: runId },
+          data: { status: "CANCELLED", finishedAt: new Date() },
+        });
+
+        // Clear the cancellation flag
+        await clearCancellationFlag(runId);
+
+        // Publish cancelled event
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("cancelled", {
+            reason: "Cancelled by user",
+          })
+        );
+
+        console.log(`[CANCELLATION] Run ${runId} cancelled successfully`);
+
+        // Shutdown SDK and return early
+        await sdk.shutdown();
+
+        return {
+          success: false,
+          userId,
+          processedAt: new Date().toISOString(),
+        };
+      }
+
       console.log(
         `\n[ROW ${i + 1}/${run.table.rows.length}] Starting enrichment`,
       );
@@ -200,7 +236,7 @@ async function processCsvEnrichment(
       });
 
       try {
-        // Run agent loop with tableId for event emission
+        // Run agent loop with tableId and runId for event emission and cancellation
         const agentResult = await runAgentLoop({
           row: rowContext,
           headers: enrichmentColumnNames,
@@ -213,6 +249,7 @@ async function processCsvEnrichment(
           rowPosition: row.position,
           currentRowIndex: i,
           totalRows: run.table.rows.length,
+          runId: runId,
         });
 
         console.log(

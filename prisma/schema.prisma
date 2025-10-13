@@ -310,6 +310,7 @@ enum Status {
   RUNNING
   COMPLETED
   FAILED
+  CANCELLED
 }
 
 model CachedTable {

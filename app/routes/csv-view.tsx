@@ -30,8 +30,10 @@ import {
   requireActiveOrg,
   validateSubscriptionAndCredits,
 } from "~/utils/auth.server";
-import { ROUTES } from "~/utils/constants";
+import { INTENTS, ROUTES } from "~/utils/constants";
 import { redirectWithToast } from "~/utils/toast.server";
+import { cancelEnrichment } from "~/lib/enrichment-cancellation.server";
+import { exportTableToCSV } from "~/lib/csv-export.server";
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const tableId = params.tableId;
@@ -83,6 +85,55 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export async function action({ request, params }: ActionFunctionArgs) {
   const formData = await request.formData();
   const intent = formData.get("intent") as string;
+  const tableId = params.tableId;
+  UNSAFE_invariant(tableId, "No id passed");
+  const { activeOrg } = await requireActiveOrg(request);
+
+  if (intent === INTENTS.CANCEL_ENRICHMENT) {
+    try {
+      const result = await cancelEnrichment(tableId, activeOrg.id);
+
+      if (result.success) {
+        return data({ success: true, message: result.message });
+      } else {
+        return data({ success: false, error: result.message }, { status: 400 });
+      }
+    } catch (error) {
+      console.error("Error cancelling enrichment:", error);
+      return data(
+        { success: false, error: "Failed to cancel enrichment" },
+        { status: 500 }
+      );
+    }
+  }
+
+  if (intent === INTENTS.EXPORT_CSV) {
+    try {
+      const result = await exportTableToCSV(tableId, activeOrg.id);
+
+      if (result.success && result.csv && result.filename) {
+        // Return CSV as downloadable file
+        return new Response(result.csv, {
+          status: 200,
+          headers: {
+            "Content-Type": "text/csv",
+            "Content-Disposition": `attachment; filename="${result.filename}"`,
+          },
+        });
+      } else {
+        return data(
+          { success: false, error: result.error || "Export failed" },
+          { status: 400 }
+        );
+      }
+    } catch (error) {
+      console.error("Error exporting CSV:", error);
+      return data(
+        { success: false, error: "Failed to export CSV" },
+        { status: 500 }
+      );
+    }
+  }
 
   if (intent === "enrich-data") {
     const orgId = await getActiveOrganizationId(request);
@@ -104,10 +155,6 @@ export async function action({ request, params }: ActionFunctionArgs) {
   }
 
   if (intent === "delete-table") {
-    const tableId = params.tableId;
-    UNSAFE_invariant(tableId, "No id passed");
-    const { activeOrg } = await requireActiveOrg(request);
-
     try {
       await deleteTable(tableId, activeOrg.id);
       return await redirectWithToast(ROUTES.DASHBOARD, {
@@ -191,6 +238,8 @@ export default function CSVView() {
         return "completed";
       case "FAILED":
         return "failed";
+      case "CANCELLED":
+        return "cancelled";
       default:
         return "idle";
     }
@@ -325,6 +374,13 @@ export default function CSVView() {
             });
           }
           break;
+
+        case "cancelled":
+          setProcessingRowId(null);
+          toast.info("Enrichment cancelled", {
+            description: "The enrichment process was cancelled.",
+          });
+          break;
       }
       } catch (e) {
         console.error("Failed to parse SSE event:", e);
@@ -337,6 +393,14 @@ export default function CSVView() {
   const handleDeleteTable = () => {
     fetcher.submit({ intent: "delete-table" }, { method: "POST" });
     setShowDeleteConfirm(false);
+  };
+
+  const handleCancelEnrichment = () => {
+    fetcher.submit({ intent: INTENTS.CANCEL_ENRICHMENT }, { method: "POST" });
+  };
+
+  const handleExportCSV = () => {
+    fetcher.submit({ intent: INTENTS.EXPORT_CSV }, { method: "POST" });
   };
 
   return (
@@ -358,9 +422,11 @@ export default function CSVView() {
               <Button
                 variant="outline"
                 className="text-gray-700 border-gray-300 hover:bg-gray-50"
+                onClick={handleExportCSV}
+                disabled={fetcher.state === "submitting"}
               >
                 <Download className="w-4 h-4" />
-                Export CSV
+                {fetcher.state === "submitting" ? "Exporting..." : "Export CSV"}
               </Button>
 
               <Button
@@ -405,11 +471,10 @@ export default function CSVView() {
                   variant="outline"
                   size="sm"
                   className="text-red-600 border-red-300 hover:bg-red-50"
-                  onClick={() => {
-                    // TODO: Implement cancel logic
-                  }}
+                  onClick={handleCancelEnrichment}
+                  disabled={fetcher.state === "submitting"}
                 >
-                  Cancel
+                  {fetcher.state === "submitting" ? "Cancelling..." : "Cancel"}
                 </Button>
               )}
             </div>
