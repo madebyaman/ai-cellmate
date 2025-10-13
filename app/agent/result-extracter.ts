@@ -2,26 +2,33 @@ import { generateObject } from "ai";
 import { z } from "zod";
 import { google } from "@ai-sdk/google";
 import type { BulkCrawlResponse } from "./scraper-tool";
+import { openai } from "@ai-sdk/openai";
 
 // Helper function to create schema dynamically based on missing columns
 const createResultExtractorSchema = (missingColumns: string[]) => {
   const columnSchemas: Record<string, z.ZodOptional<z.ZodObject<any>>> = {};
 
   for (const column of missingColumns) {
-    columnSchemas[column] = z.object({
-      result: z.string().describe("The extracted value for this column"),
-      source: z.string().describe("The source URL where this information was found"),
-    }).optional();
+    columnSchemas[column] = z
+      .object({
+        result: z.string().describe("The extracted value for this column"),
+        source: z
+          .string()
+          .describe("The source URL where this information was found"),
+      })
+      .optional();
   }
 
   return z.object(columnSchemas);
 };
 
 type ResultExtractorResult = {
-  [key: string]: {
-    result: string;
-    source: string;
-  } | undefined;
+  [key: string]:
+    | {
+        result: string;
+        source: string;
+      }
+    | undefined;
 };
 
 interface ExtractionInput {
@@ -64,7 +71,7 @@ export const extractResultsFromCrawledData = async (
   const dynamicSchema = createResultExtractorSchema(missingColumns);
 
   const result = await generateObject({
-    model: google("gemini-2.5-flash"),
+    model: openai("gpt-5-nano"),
     schema: dynamicSchema,
     system: `
     You are a CSV data extraction specialist. Your job is to analyze crawled webpage content and extract specific data to fill missing CSV cells.
@@ -156,7 +163,9 @@ Focus on extracting factual, specific information that directly answers what eac
     reportUsage("result-extracter", result.usage);
   }
 
-  const extractedColumns = Object.keys(result.object).filter(key => result.object[key] !== undefined);
+  const extractedColumns = Object.keys(result.object).filter(
+    (key) => result.object[key] !== undefined,
+  );
   console.log(
     `[EXTRACTION] Extracted ${extractedColumns.length} column values: ${extractedColumns.join(", ")}`,
   );

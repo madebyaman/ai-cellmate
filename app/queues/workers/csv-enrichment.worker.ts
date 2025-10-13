@@ -178,6 +178,7 @@ async function processCsvEnrichment(
       );
 
       // Emit row-start event
+      console.log(`[PUBLISH] row-start - Row ${row.position} (${row.id})`);
       await publishEnrichmentEvent(
         run.table.id,
         createEnrichmentEvent("row-start", {
@@ -185,6 +186,7 @@ async function processCsvEnrichment(
           rowPosition: row.position,
         })
       );
+      console.log(`[PUBLISH] row-start event sent successfully`);
 
       const rowTrace = langfuse.trace({
         sessionId: userId,
@@ -231,12 +233,14 @@ async function processCsvEnrichment(
         );
 
         // Emit stage-start for "Saving"
+        console.log(`[PUBLISH] stage-start - Saving`);
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("stage-start", {
             stage: "Saving",
           })
         );
+        console.log(`[PUBLISH] stage-start (Saving) event sent successfully`);
 
         // Create CellVersions for enriched data and emit cell-update events
         for (const enrichmentCol of enrichmentColumns) {
@@ -259,6 +263,7 @@ async function processCsvEnrichment(
               );
 
               // Emit cell-update event
+              console.log(`[PUBLISH] cell-update - Row ${row.position}, Column ${enrichmentCol.name}`);
               await publishEnrichmentEvent(
                 run.table.id,
                 createEnrichmentEvent("cell-update", {
@@ -268,19 +273,23 @@ async function processCsvEnrichment(
                   value: value,
                 })
               );
+              console.log(`[PUBLISH] cell-update event sent successfully`);
             }
           }
         }
 
         // Emit stage-complete for "Saving"
+        console.log(`[PUBLISH] stage-complete - Saving`);
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("stage-complete", {
             stage: "Saving",
           })
         );
+        console.log(`[PUBLISH] stage-complete (Saving) event sent successfully`);
 
         // Emit row-complete event
+        console.log(`[PUBLISH] row-complete - Row ${row.position} (${row.id}), filled ${filledCount}/${enrichmentColumnNames.length}`);
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("row-complete", {
@@ -290,6 +299,7 @@ async function processCsvEnrichment(
             columnsTotal: enrichmentColumnNames.length,
           })
         );
+        console.log(`[PUBLISH] row-complete event sent successfully`);
 
         rowTrace.update({
           output: {
@@ -305,6 +315,7 @@ async function processCsvEnrichment(
         );
 
         // Emit row-failed event
+        console.log(`[PUBLISH] row-failed - Row ${row.position} (${row.id}), reason: ${error instanceof Error ? error.message : "Unknown error"}`);
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("row-failed", {
@@ -313,6 +324,7 @@ async function processCsvEnrichment(
             reason: error instanceof Error ? error.message : "Unknown error",
           })
         );
+        console.log(`[PUBLISH] row-failed event sent successfully`);
 
         rowTrace.update({
           metadata: { error: error instanceof Error ? error.message : "Unknown error" },
@@ -333,10 +345,12 @@ async function processCsvEnrichment(
     console.log(`[CACHE UPDATED] Table ${run.table.id}`);
 
     // 8. Emit complete event
+    console.log(`[PUBLISH] complete - All rows processed`);
     await publishEnrichmentEvent(
       run.table.id,
       createEnrichmentEvent("complete", {})
     );
+    console.log(`[PUBLISH] complete event sent successfully`);
 
     await sdk.shutdown();
 

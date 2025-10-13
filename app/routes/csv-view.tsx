@@ -18,7 +18,13 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "~/components/accordion";
-import { deleteTable, getTableWithCachedData } from "~/lib/table.server";
+import {
+  deleteTable,
+  getTableWithCachedData,
+  getTableStatus,
+  getTableData,
+  getCompletedRowIds,
+} from "~/lib/table.server";
 import {
   getActiveOrganizationId,
   requireActiveOrg,
@@ -32,18 +38,45 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
   UNSAFE_invariant(tableId, "No id passed");
   const { activeOrg } = await requireActiveOrg(request);
 
-  // Fetch the table with tableId, ensure it belongs to activeOrg.id
-  const tableData = await getTableWithCachedData(tableId, activeOrg.id);
+  // First, get the table status
+  const tableStatusData = await getTableStatus(tableId, activeOrg.id);
 
-  if (!tableData) {
+  if (!tableStatusData) {
     throw new Response("Table not found", { status: 404 });
   }
 
-  // Return table with name, cachedData
+  const { table, status, runId } = tableStatusData;
+
+  // Decide whether to use live data or cached data based on status
+  let cachedData;
+  let completedRowIds: string[] = [];
+
+  if (status === "RUNNING" || status === "PENDING") {
+    // Use live data when processing
+    cachedData = await getTableData(tableId, activeOrg.id);
+    if (runId) {
+      completedRowIds = await getCompletedRowIds(tableId, runId);
+    }
+  } else {
+    // Use cached data when completed
+    const tableData = await getTableWithCachedData(tableId, activeOrg.id);
+    if (!tableData) {
+      throw new Response("Table not found", { status: 404 });
+    }
+    cachedData = tableData.cachedData;
+    completedRowIds = tableData.completedRowIds;
+  }
+
+  // Return table with name, cachedData, and completed row IDs
   return data({
-    table: tableData.table,
-    cachedData: tableData.cachedData,
-    status: tableData.status,
+    table: {
+      id: table.id,
+      name: table.name,
+      createdAt: table.createdAt,
+    },
+    cachedData,
+    status,
+    completedRowIds,
   });
 }
 
@@ -96,17 +129,43 @@ export async function action({ request, params }: ActionFunctionArgs) {
 }
 
 export default function CSVView() {
-  const { table, cachedData, status } = useLoaderData<typeof loader>();
+  const {
+    table,
+    cachedData,
+    status,
+    completedRowIds: initialCompletedRowIds,
+  } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+
+  // Initialize enriched cells from cached data
+  const initialEnrichedCells: Record<string, Record<string, string>> = {};
+  cachedData.rows.forEach((row) => {
+    const rowCells: Record<string, string> = {};
+    row.cells.forEach((cell) => {
+      if (cell.versions.length > 0) {
+        const pickedVersion = cell.versions.find((v) => v.picked);
+        const currentVersion = pickedVersion || cell.versions[0];
+        if (currentVersion?.value) {
+          rowCells[cell.columnId] = currentVersion.value;
+        }
+      }
+    });
+    if (Object.keys(rowCells).length > 0) {
+      initialEnrichedCells[row.id] = rowCells;
+    }
+  });
+
   const [enrichedCells, setEnrichedCells] = useState<
     Record<string, Record<string, string>>
-  >({});
+  >(initialEnrichedCells);
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
   const [completedRowIds, setCompletedRowIds] = useState<Set<string>>(
-    new Set(),
+    new Set(initialCompletedRowIds || []),
   );
   const hasShownSuccessToastRef = useRef(false);
+  const processedEventCountRef = useRef(0);
+  const processingRowRef = useRef<HTMLTableRowElement>(null);
   const totalRows = cachedData.rows.length;
 
   // Derived states
@@ -139,23 +198,51 @@ export default function CSVView() {
 
   const enrichmentState = getEnrichmentState();
 
+  // Reset processed event count when enrichment state changes
+  useEffect(() => {
+    processedEventCountRef.current = 0;
+  }, [enrichmentState]);
+
+  // Auto-scroll to processing row
+  useEffect(() => {
+    if (processingRowId && processingRowRef.current) {
+      processingRowRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [processingRowId]);
+
   // Subscribe to SSE stream when processing (single connection)
-  const updateEvent = useEventSource(`/app/${table.id}/stream`, {
+  const eventQueue = useEventSource(`/app/${table.id}/stream`, {
     event: "update",
     enabled: enrichmentState === "processing",
   });
 
   // Handle incoming events with useEffect to avoid infinite renders
   useEffect(() => {
-    if (!updateEvent) return;
+    const unprocessedCount = eventQueue.length - processedEventCountRef.current;
 
-    try {
-      const eventData = JSON.parse(updateEvent);
+    if (unprocessedCount <= 0) {
+      return;
+    }
+
+    // Process only NEW events that we haven't processed yet
+    for (let i = processedEventCountRef.current; i < eventQueue.length; i++) {
+      const updateEvent = eventQueue[i];
+      try {
+        const eventData = JSON.parse(updateEvent);
 
       switch (eventData.type) {
         case "row-start":
           setProcessingRowId(eventData.rowId);
-          // should reset the stages?
+          setStages([
+            { name: "Searching data", status: "pending" },
+            { name: "Scraping", status: "pending" },
+            { name: "Parsing", status: "pending" },
+            { name: "Lookups", status: "pending" },
+            { name: "Saving", status: "pending" },
+          ]);
           break;
 
         case "stage-start":
@@ -179,7 +266,6 @@ export default function CSVView() {
           break;
 
         case "cell-update":
-          // Update individual cell in real-time
           setEnrichedCells((prev) => {
             const rowCells = prev[eventData.rowId] || {};
             return {
@@ -195,80 +281,43 @@ export default function CSVView() {
         case "row-complete":
           setProcessingRowId(null);
           setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
-          // Don't think we should reset or mark stages as completed. Should be handled by other events
-
-          // Mark all stages as completed for visual feedback
-          setStages((prev) =>
-            prev.map((stage) => ({ ...stage, status: "completed" })),
-          );
-
-          // Reset stages to pending after 800ms to show visual separation before next row
-          setTimeout(() => {
-            setStages([
-              { name: "Searching data", status: "pending" },
-              { name: "Scraping", status: "pending" },
-              { name: "Parsing", status: "pending" },
-              { name: "Lookups", status: "pending" },
-              { name: "Saving", status: "pending" },
-            ]);
-          }, 100);
           break;
 
         case "row-retrying":
-          // we should get which row is retrying. And mark all stages as pending. But check if after row-retrying we send row-state event. If so, mark all stages as pending will be done by row-start
-          setProcessingRowId(null);
-
-          // Mark all stages as completed
-          setStages((prev) =>
-            prev.map((stage) => ({ ...stage, status: "completed" })),
-          );
-
-          // Reset stages immediately for cycle 2
-          setTimeout(() => {
-            setStages([
-              { name: "Searching data", status: "pending" },
-              { name: "Scraping", status: "pending" },
-              { name: "Parsing", status: "pending" },
-              { name: "Lookups", status: "pending" },
-              { name: "Saving", status: "pending" },
-            ]);
-          }, 100);
+          setStages([
+            { name: "Searching data", status: "pending" },
+            { name: "Scraping", status: "pending" },
+            { name: "Parsing", status: "pending" },
+            { name: "Lookups", status: "pending" },
+            { name: "Saving", status: "pending" },
+          ]);
+          toast.info("Retrying row", {
+            description: `Row ${eventData.rowPosition} - Cycle ${eventData.cycle}`,
+          });
           break;
 
         case "row-failed":
           setProcessingRowId(null);
-          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId)); // Count failed rows as completed for progress
-
-          // Mark all stages as completed (some may have been completed before failure)
-          setStages((prev) =>
-            prev.map((stage) => ({ ...stage, status: "completed" })),
-          );
-
-          // Reset stages to pending after 800ms
-          setTimeout(() => {
-            setStages([
-              { name: "Searching data", status: "pending" },
-              { name: "Scraping", status: "pending" },
-              { name: "Parsing", status: "pending" },
-              { name: "Lookups", status: "pending" },
-              { name: "Saving", status: "pending" },
-            ]);
-          }, 100);
+          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+          toast.error("Row enrichment failed", {
+            description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
+          });
           break;
 
         case "row-skipped":
           setProcessingRowId(null);
-          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId)); // Count skipped rows as completed for progress
+          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+          toast.info("Row skipped", {
+            description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
+          });
           break;
 
         case "complete":
           setProcessingRowId(null);
-          // Mark all stages as completed
           setStages((prev) =>
             prev.map((stage) => ({ ...stage, status: "completed" })),
           );
 
-          // Show success toast only once
           if (!hasShownSuccessToastRef.current) {
             hasShownSuccessToastRef.current = true;
             toast.success("Enrichment completed successfully!", {
@@ -277,10 +326,13 @@ export default function CSVView() {
           }
           break;
       }
-    } catch (e) {
-      console.error("Failed to parse event:", e);
+      } catch (e) {
+        console.error("Failed to parse SSE event:", e);
+      }
     }
-  }, [updateEvent]);
+
+    processedEventCountRef.current = eventQueue.length;
+  }, [eventQueue, completedRowIds.size]);
 
   const handleDeleteTable = () => {
     fetcher.submit({ intent: "delete-table" }, { method: "POST" });
@@ -344,7 +396,7 @@ export default function CSVView() {
                   <div className="text-sm text-gray-600">
                     {progress === 100
                       ? `${cachedData.rows.length} of ${cachedData.rows.length} rows processed`
-                      : `Processing row ${Math.round((progress / 100) * cachedData.rows.length)} of ${cachedData.rows.length}`}
+                      : `Processing row ${completedRows + 1} of ${cachedData.rows.length}`}
                   </div>
                 </div>
               </div>
@@ -355,7 +407,6 @@ export default function CSVView() {
                   className="text-red-600 border-red-300 hover:bg-red-50"
                   onClick={() => {
                     // TODO: Implement cancel logic
-                    console.log("Cancel enrichment");
                   }}
                 >
                   Cancel
@@ -450,6 +501,7 @@ export default function CSVView() {
               return (
                 <tr
                   key={row.id}
+                  ref={isProcessing ? processingRowRef : null}
                   className={`transition-colors duration-150 ${
                     isProcessing
                       ? "bg-orange-50 border-l-4 border-l-orange-500"

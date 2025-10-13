@@ -28,6 +28,134 @@ export type TableWithLatestRun = Awaited<
   ReturnType<typeof getTablesForOrganization>
 >[number];
 
+export async function getTableStatus(tableId: string, organizationId: string) {
+  const table = await prisma.table.findFirst({
+    where: {
+      id: tableId,
+      organizationId,
+    },
+    select: {
+      createdAt: true,
+      id: true,
+      name: true,
+      runs: {
+        take: 1,
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          status: true,
+        },
+      },
+    },
+  });
+
+  if (!table) {
+    return null;
+  }
+
+  const status = table.runs[0]?.status ?? "PENDING";
+  const runId = table.runs[0]?.id;
+
+  return { table, status, runId };
+}
+
+export async function getCompletedRowIds(
+  tableId: string,
+  runId: string,
+): Promise<string[]> {
+  const completedRows = await prisma.row.findMany({
+    where: {
+      tableId,
+      cells: {
+        some: {
+          cellVersions: {
+            some: { runId },
+          },
+        },
+      },
+    },
+    select: { id: true },
+  });
+
+  return completedRows.map((r) => r.id);
+}
+
+export async function getTableData(
+  tableId: string,
+  organizationId: string,
+): Promise<CachedTableData> {
+  const table = await prisma.table.findFirst({
+    where: {
+      id: tableId,
+      organizationId,
+    },
+    include: {
+      columns: {
+        orderBy: { position: "asc" },
+      },
+      rows: {
+        orderBy: { position: "asc" },
+        include: {
+          cells: {
+            include: {
+              cellVersions: {
+                orderBy: { createdAt: "desc" },
+              },
+            },
+          },
+        },
+      },
+    },
+  });
+
+  if (!table) {
+    throw new Error("Table not found");
+  }
+
+  return {
+    name: table.name,
+    columns: table.columns.map((col) => ({
+      id: col.id,
+      name: col.name,
+      position: col.position,
+      tableId: table.id,
+      createdAt: col.createdAt.toISOString(),
+      updatedAt: col.updatedAt.toISOString(),
+      type: col.type,
+    })),
+    rows: table.rows.map((row) => ({
+      id: row.id,
+      position: row.position,
+      tableId: table.id,
+      name: row.name,
+      createdAt: row.createdAt.toISOString(),
+      updatedAt: row.updatedAt.toISOString(),
+      cells: row.cells.map((cell) => ({
+        id: cell.id,
+        rowId: row.id,
+        columnId: cell.columnId,
+        createdAt: cell.createdAt.toISOString(),
+        updatedAt: cell.updatedAt.toISOString(),
+        versions: cell.cellVersions.map((version) => ({
+          id: version.id,
+          value: version.value,
+          picked: version.picked,
+          createdAt: version.createdAt.toISOString(),
+          updatedAt: version.updatedAt.toISOString(),
+          pickedAt: version.pickedAt?.toISOString() ?? null,
+          cellId: cell.id,
+          sourceUrl: version.sourceUrl,
+          confidence: version.confidence,
+          origin: version.origin,
+          runId: version.runId,
+        })),
+      })),
+    })),
+  };
+}
+
 export async function getTableWithCachedData(
   tableId: string,
   organizationId: string,
@@ -48,6 +176,7 @@ export async function getTableWithCachedData(
           createdAt: "desc",
         },
         select: {
+          id: true,
           status: true,
         },
       },
@@ -59,6 +188,8 @@ export async function getTableWithCachedData(
   }
 
   const { runs, cachedTable, ...tableWithoutCachedData } = tableWithCache;
+  const status = runs[0]?.status ?? "PENDING";
+
   let cachedData: CachedTableData;
 
   if (tableWithCache.cachedTable) {
@@ -68,9 +199,29 @@ export async function getTableWithCachedData(
     cachedData = await updateCachedTable(tableId);
   }
 
-  const status = runs[0]?.status ?? "PENDING";
+  // Query completed rows only when enrichment is actively running
+  let completedRowIds: string[] = [];
+  if (status === "RUNNING" || status === "PENDING") {
+    const currentRunId = runs[0].id;
 
-  return { table: tableWithoutCachedData, cachedData, status };
+    const completedRows = await prisma.row.findMany({
+      where: {
+        tableId,
+        cells: {
+          some: {
+            cellVersions: {
+              some: { runId: currentRunId },
+            },
+          },
+        },
+      },
+      select: { id: true },
+    });
+
+    completedRowIds = completedRows.map((r) => r.id);
+  }
+
+  return { table: tableWithoutCachedData, cachedData, status, completedRowIds };
 }
 
 export async function deleteTable(tableId: string, organizationId: string) {

@@ -70,11 +70,12 @@ export const runAgentLoop = async (
     try {
       // Emit stage-start for "Searching data"
       if (tableId) {
+        console.log(`[PUBLISH] stage-start - Searching data`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-start", {
             stage: "Searching data",
-          })
+          }),
         );
       }
 
@@ -123,11 +124,12 @@ export const runAgentLoop = async (
 
       // Emit stage-complete for "Searching data"
       if (tableId) {
+        console.log(`[PUBLISH] stage-complete - Searching data`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-complete", {
             stage: "Searching data",
-          })
+          }),
         );
       }
 
@@ -163,11 +165,12 @@ export const runAgentLoop = async (
 
       // Emit stage-start for "Scraping"
       if (tableId) {
+        console.log(`[PUBLISH] stage-start - Scraping`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-start", {
             stage: "Scraping",
-          })
+          }),
         );
       }
 
@@ -195,37 +198,41 @@ export const runAgentLoop = async (
 
       // Emit stage-complete for "Scraping"
       if (tableId) {
+        console.log(`[PUBLISH] stage-complete - Scraping`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-complete", {
             stage: "Scraping",
-          })
+          }),
         );
       }
 
       // Emit stage-start for "Parsing" (implicit in scraping, so complete immediately)
       if (tableId) {
+        console.log(`[PUBLISH] stage-start - Parsing`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-start", {
             stage: "Parsing",
-          })
+          }),
         );
+        console.log(`[PUBLISH] stage-complete - Parsing`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-complete", {
             stage: "Parsing",
-          })
+          }),
         );
       }
 
       // Emit stage-start for "Lookups"
       if (tableId) {
+        console.log(`[PUBLISH] stage-start - Lookups`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-start", {
             stage: "Lookups",
-          })
+          }),
         );
       }
 
@@ -243,18 +250,21 @@ export const runAgentLoop = async (
         { langfuseTraceId },
       );
 
-      const extractedColumns = Object.keys(extractedData).filter(key => extractedData[key] !== undefined);
+      const extractedColumns = Object.keys(extractedData).filter(
+        (key) => extractedData[key] !== undefined,
+      );
       console.log(
         `[EXTRACTION] Found values for: ${extractedColumns.length > 0 ? extractedColumns.join(", ") : "none"}`,
       );
 
       // Emit stage-complete for "Lookups"
       if (tableId) {
+        console.log(`[PUBLISH] stage-complete - Lookups`);
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("stage-complete", {
             stage: "Lookups",
-          })
+          }),
         );
       }
 
@@ -283,8 +293,17 @@ export const runAgentLoop = async (
       }
 
       // Check if we're about to enter cycle 2 (row-retrying event)
-      if (currentCycle === 0 && !context.isRowComplete() && tableId && rowId && rowPosition) {
+      if (
+        currentCycle === 0 &&
+        !context.isRowComplete() &&
+        tableId &&
+        rowId &&
+        rowPosition
+      ) {
         const filledCount = headers.length - context.getMissingColumns().length;
+        console.log(
+          `[PUBLISH] row-retrying - Row ${rowPosition}, filled ${filledCount}/${headers.length}, cycle 2`,
+        );
         await publishEnrichmentEvent(
           tableId,
           createEnrichmentEvent("row-retrying", {
@@ -293,7 +312,7 @@ export const runAgentLoop = async (
             columnsFilled: filledCount,
             columnsTotal: headers.length,
             cycle: 2,
-          })
+          }),
         );
       }
     } catch (error) {
