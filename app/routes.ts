@@ -20,7 +20,6 @@ export default [
   route("create-workspace", "routes/create-organization.tsx"),
   route("billing", "./routes/billing.tsx"),
   route("logout", "routes/logout.ts"),
-  route("csv-playground", "routes/csv-playground-vanilla.tsx"),
 
   // Redirect route for /app
   // route("app", "routes/middleware.tsx"),
@@ -30,7 +29,6 @@ export default [
     index("./routes/dashboard.tsx"),
     route("/app/:tableId", "routes/csv-view.tsx"),
     route("/app/:tableId/stream", "routes/csv-view.$tableId.stream.tsx"),
-    route("csv-playground", "routes/csv-playground.tsx"),
     route("settings", "./routes/settings.tsx", [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),
