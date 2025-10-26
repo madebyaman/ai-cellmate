@@ -9,7 +9,7 @@ import {
   useFetcher,
   useLoaderData,
 } from "react-router";
-import { useEventSource } from "~/hooks/useEventSource";
+import { useEventSource } from "remix-utils/sse/react";
 import LayoutWrapper from "~/components/layout-wrapper";
 import { Button } from "~/components/ui/button";
 import { toast } from "sonner";
@@ -111,6 +111,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
     const orgId = await getActiveOrganizationId(request);
 
     // Validate subscription and credits
+    UNSAFE_invariant(orgId, "No orgId found");
     const validation = await validateSubscriptionAndCredits(request, orgId, 10);
 
     if (!validation.valid) {
