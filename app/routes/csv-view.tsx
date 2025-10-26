@@ -4,6 +4,7 @@ import {
   type ActionFunctionArgs,
   data,
   type LoaderFunctionArgs,
+  type MetaFunction,
   UNSAFE_invariant,
   useFetcher,
   useLoaderData,
@@ -101,7 +102,7 @@ export async function action({ request, params }: ActionFunctionArgs) {
       console.error("Error cancelling enrichment:", error);
       return data(
         { success: false, error: "Failed to cancel enrichment" },
-        { status: 500 }
+        { status: 500 },
       );
     }
   }
@@ -146,6 +147,21 @@ export async function action({ request, params }: ActionFunctionArgs) {
   return data({ error: "Invalid intent" }, { status: 400 });
 }
 
+export const meta: MetaFunction<typeof loader> = ({ data }) => {
+  return [
+    {
+      title: data?.table?.name
+        ? `${data.table.name} - AI Cellmate`
+        : "CSV View - AI Cellmate",
+    },
+    {
+      name: "description",
+      content:
+        "View and manage your CSV data enrichment progress in real-time.",
+    },
+  ];
+};
+
 export default function CSVView() {
   const {
     table,
@@ -174,9 +190,8 @@ export default function CSVView() {
     }
   });
 
-  const [enrichedCells, setEnrichedCells] = useState<
-    Record<string, Record<string, string>>
-  >(initialEnrichedCells);
+  const [enrichedCells, setEnrichedCells] =
+    useState<Record<string, Record<string, string>>>(initialEnrichedCells);
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
   const [completedRowIds, setCompletedRowIds] = useState<Set<string>>(
     new Set(initialCompletedRowIds || []),
@@ -253,106 +268,106 @@ export default function CSVView() {
       try {
         const eventData = JSON.parse(updateEvent);
 
-      switch (eventData.type) {
-        case "row-start":
-          setProcessingRowId(eventData.rowId);
-          setStages([
-            { name: "Searching data", status: "pending" },
-            { name: "Scraping", status: "pending" },
-            { name: "Parsing", status: "pending" },
-            { name: "Lookups", status: "pending" },
-            { name: "Saving", status: "pending" },
-          ]);
-          break;
+        switch (eventData.type) {
+          case "row-start":
+            setProcessingRowId(eventData.rowId);
+            setStages([
+              { name: "Searching data", status: "pending" },
+              { name: "Scraping", status: "pending" },
+              { name: "Parsing", status: "pending" },
+              { name: "Lookups", status: "pending" },
+              { name: "Saving", status: "pending" },
+            ]);
+            break;
 
-        case "stage-start":
-          setStages((prev) =>
-            prev.map((stage) =>
-              stage.name === eventData.stage
-                ? { ...stage, status: "in-progress" }
-                : stage,
-            ),
-          );
-          break;
+          case "stage-start":
+            setStages((prev) =>
+              prev.map((stage) =>
+                stage.name === eventData.stage
+                  ? { ...stage, status: "in-progress" }
+                  : stage,
+              ),
+            );
+            break;
 
-        case "stage-complete":
-          setStages((prev) =>
-            prev.map((stage) =>
-              stage.name === eventData.stage
-                ? { ...stage, status: "completed" }
-                : stage,
-            ),
-          );
-          break;
+          case "stage-complete":
+            setStages((prev) =>
+              prev.map((stage) =>
+                stage.name === eventData.stage
+                  ? { ...stage, status: "completed" }
+                  : stage,
+              ),
+            );
+            break;
 
-        case "cell-update":
-          setEnrichedCells((prev) => {
-            const rowCells = prev[eventData.rowId] || {};
-            return {
-              ...prev,
-              [eventData.rowId]: {
-                ...rowCells,
-                [eventData.columnId]: eventData.value,
-              },
-            };
-          });
-          break;
-
-        case "row-complete":
-          setProcessingRowId(null);
-          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
-          break;
-
-        case "row-retrying":
-          setStages([
-            { name: "Searching data", status: "pending" },
-            { name: "Scraping", status: "pending" },
-            { name: "Parsing", status: "pending" },
-            { name: "Lookups", status: "pending" },
-            { name: "Saving", status: "pending" },
-          ]);
-          toast.info("Retrying row", {
-            description: `Row ${eventData.rowPosition} - Cycle ${eventData.cycle}`,
-          });
-          break;
-
-        case "row-failed":
-          setProcessingRowId(null);
-          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
-          toast.error("Row enrichment failed", {
-            description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
-          });
-          break;
-
-        case "row-skipped":
-          setProcessingRowId(null);
-          setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
-          toast.info("Row skipped", {
-            description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
-          });
-          break;
-
-        case "complete":
-          setProcessingRowId(null);
-          setStages((prev) =>
-            prev.map((stage) => ({ ...stage, status: "completed" })),
-          );
-
-          if (!hasShownSuccessToastRef.current) {
-            hasShownSuccessToastRef.current = true;
-            toast.success("Enrichment completed successfully!", {
-              description: "All rows have been processed.",
+          case "cell-update":
+            setEnrichedCells((prev) => {
+              const rowCells = prev[eventData.rowId] || {};
+              return {
+                ...prev,
+                [eventData.rowId]: {
+                  ...rowCells,
+                  [eventData.columnId]: eventData.value,
+                },
+              };
             });
-          }
-          break;
+            break;
 
-        case "cancelled":
-          setProcessingRowId(null);
-          toast.info("Enrichment cancelled", {
-            description: "The enrichment process was cancelled.",
-          });
-          break;
-      }
+          case "row-complete":
+            setProcessingRowId(null);
+            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            break;
+
+          case "row-retrying":
+            setStages([
+              { name: "Searching data", status: "pending" },
+              { name: "Scraping", status: "pending" },
+              { name: "Parsing", status: "pending" },
+              { name: "Lookups", status: "pending" },
+              { name: "Saving", status: "pending" },
+            ]);
+            toast.info("Retrying row", {
+              description: `Row ${eventData.rowPosition} - Cycle ${eventData.cycle}`,
+            });
+            break;
+
+          case "row-failed":
+            setProcessingRowId(null);
+            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            toast.error("Row enrichment failed", {
+              description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
+            });
+            break;
+
+          case "row-skipped":
+            setProcessingRowId(null);
+            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            toast.info("Row skipped", {
+              description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
+            });
+            break;
+
+          case "complete":
+            setProcessingRowId(null);
+            setStages((prev) =>
+              prev.map((stage) => ({ ...stage, status: "completed" })),
+            );
+
+            if (!hasShownSuccessToastRef.current) {
+              hasShownSuccessToastRef.current = true;
+              toast.success("Enrichment completed successfully!", {
+                description: "All rows have been processed.",
+              });
+            }
+            break;
+
+          case "cancelled":
+            setProcessingRowId(null);
+            toast.info("Enrichment cancelled", {
+              description: "The enrichment process was cancelled.",
+            });
+            break;
+        }
       } catch (e) {
         console.error("Failed to parse SSE event:", e);
       }
@@ -589,7 +604,7 @@ export default function CSVView() {
                   }`}
                 >
                   <td className="px-4 py-3 text-sm text-gray-500 text-center font-mono">
-                    {row.position}
+                    {row.position + 1}
                   </td>
                   {cachedData.columns.map((column) => {
                     const cellValue = getCellValue(column.id);
