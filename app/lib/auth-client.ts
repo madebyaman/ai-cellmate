@@ -1,9 +1,12 @@
 import { stripeClient } from "@better-auth/stripe/client";
-import { magicLinkClient, organizationClient } from "better-auth/client/plugins";
+import {
+  magicLinkClient,
+  organizationClient,
+} from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  baseURL: "http://localhost:5173",
+  baseURL: process.env.BASE_URL,
   plugins: [
     organizationClient(),
     magicLinkClient(),
@@ -13,7 +16,6 @@ export const authClient = createAuthClient({
   ],
   fetchOptions: {
     onError: async (context) => {
-      console.log("error in fetchoptions >>>>>", context);
       const { response } = context;
       if (response.status === 429) {
         const retryAfter = response.headers.get("X-Retry-After");
