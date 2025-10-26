@@ -31,6 +31,34 @@ type ResultExtractorResult = {
     | undefined;
 };
 
+// Helper function to validate and transform the result object
+const validateResultExtractorOutput = (
+  output: Record<string, any>,
+): ResultExtractorResult => {
+  const validated: ResultExtractorResult = {};
+
+  for (const [key, value] of Object.entries(output)) {
+    if (value === undefined || value === null) {
+      validated[key] = undefined;
+    } else if (
+      typeof value === 'object' &&
+      'result' in value &&
+      'source' in value &&
+      typeof value.result === 'string' &&
+      typeof value.source === 'string'
+    ) {
+      validated[key] = {
+        result: value.result,
+        source: value.source,
+      };
+    } else {
+      validated[key] = undefined;
+    }
+  }
+
+  return validated;
+};
+
 interface ExtractionInput {
   row: Record<string, string>;
   headers: string[];
@@ -163,12 +191,14 @@ Focus on extracting factual, specific information that directly answers what eac
     reportUsage("result-extracter", result.usage);
   }
 
-  const extractedColumns = Object.keys(result.object).filter(
-    (key) => result.object[key] !== undefined,
+  const validated = validateResultExtractorOutput(result.object);
+
+  const extractedColumns = Object.keys(validated).filter(
+    (key) => validated[key] !== undefined,
   );
   console.log(
     `[EXTRACTION] Extracted ${extractedColumns.length} column values: ${extractedColumns.join(", ")}`,
   );
 
-  return result.object;
+  return validated;
 };

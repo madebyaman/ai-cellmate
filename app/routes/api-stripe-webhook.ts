@@ -91,6 +91,11 @@ async function handleCheckoutSessionCompleted(
     const organizationId = session.metadata?.organizationId;
     const isBooster = session.metadata?.plan === BOOSTER_PLAN_NAME;
 
+    if (!organizationId) {
+      console.error("No organizationId found in checkout session metadata");
+      return;
+    }
+
     // 2. Get the subscription to find the plan
     const customerId = session.customer;
     if (!customerId || typeof customerId !== "string") {

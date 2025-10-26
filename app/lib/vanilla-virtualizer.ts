@@ -365,7 +365,9 @@ export class VanillaVirtualizer {
 
         // Update content
         const row = this.csvData?.rows[currentDataIndex];
-        this.config.onRowRender(node, row, currentDataIndex, this.isMobile);
+        if (row) {
+          this.config.onRowRender(node, row, currentDataIndex, this.isMobile);
+        }
       } else {
         // Node is not visible - hide it but keep in DOM
         node.style.visibility = "hidden";

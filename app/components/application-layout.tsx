@@ -141,7 +141,7 @@ export default function ApplicationLayout({
                     <div className="mb-4">
                       <WorkspaceDropdown
                         orgs={orgs}
-                        selectedOrgId={selectedOrgId}
+                        selectedOrgId={selectedOrgId ?? null}
                       />
                     </div>
                   )}
@@ -287,7 +287,7 @@ export default function ApplicationLayout({
           {/* Workspace Dropdown at top */}
           {orgs.length > 0 && (
             <div className="mb-4">
-              <WorkspaceDropdown orgs={orgs} selectedOrgId={selectedOrgId} />
+              <WorkspaceDropdown orgs={orgs} selectedOrgId={selectedOrgId ?? null} />
             </div>
           )}
 
