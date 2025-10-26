@@ -35,6 +35,7 @@ export default [
       index("./routes/profile-settings.tsx"),
       route("billing", "./routes/billing-settings.tsx"),
       route("team", "./routes/team-settings.tsx"),
+      route("danger", "./routes/danger-settings.tsx"),
     ]),
   ]),
 ] satisfies RouteConfig;

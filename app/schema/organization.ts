@@ -29,5 +29,24 @@ export const inviteMemberSchema = z.object({
     .min(1, "Email is required"),
 });
 
+export const deleteOrganizationSchema = z.object({
+  "organization-id": z.string().min(1, "Organization ID is required"),
+  confirmation: z
+    .string({ required_error: "Please type DELETE to confirm" })
+    .refine((val) => val === "DELETE", {
+      message: "Please type DELETE to confirm",
+    }),
+});
+
+export const deleteProfileSchema = z.object({
+  confirmation: z
+    .string({ required_error: "Please type DELETE to confirm" })
+    .refine((val) => val === "DELETE", {
+      message: "Please type DELETE to confirm",
+    }),
+});
+
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+export type DeleteOrganizationInput = z.infer<typeof deleteOrganizationSchema>;
+export type DeleteProfileInput = z.infer<typeof deleteProfileSchema>;

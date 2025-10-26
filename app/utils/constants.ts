@@ -22,6 +22,8 @@ export const INTENTS = {
   INTENT: "intent",
   CANCEL_ENRICHMENT: "cancel-enrichment",
   EXPORT_CSV: "export-csv",
+  DELETE_PROFILE: "delete-profile",
+  DELETE_ORGANIZATION: "delete-organization",
 };
 
 export const CHANGE_WORKSPACE_FORM = {
@@ -36,6 +38,15 @@ export const CREATE_WORKSPACE_FORM = {
 
 export const INVITE_MEMBER_FORM = {
   EMAIL: "email",
+};
+
+export const DELETE_ORGANIZATION_FORM = {
+  ORGANIZATION_ID: "organization-id",
+  CONFIRMATION: "confirmation",
+};
+
+export const DELETE_PROFILE_FORM = {
+  CONFIRMATION: "confirmation",
 };
 
 export const BOOSTER_PLAN_NAME = "booster";
