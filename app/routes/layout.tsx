@@ -1,6 +1,7 @@
 import { parseWithZod } from "@conform-to/zod";
 import { Frown, HeartIcon, Menu, SmileIcon, ThumbsUp, X } from "lucide-react";
 import {
+  Form,
   Link,
   NavLink,
   Outlet,
@@ -22,6 +23,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from "~/components/popover";
 import SubscriptionAlert from "~/components/subscription-alert";
 import { Button } from "~/components/ui/button";
+import { Logo } from "~/components/ui/logo";
 import WorkspaceDropdown from "~/components/workspace-dropdown";
 import { auth } from "~/lib/auth.server";
 import { prisma } from "~/lib/prisma.server";
@@ -52,7 +54,7 @@ const navigation = [
 ];
 
 const userNavigation = [
-  { name: "Your Profile", href: "#" },
+  { name: "Your Profile", href: "/app/settings" },
   { name: "Sign out", href: "#" },
 ];
 
@@ -145,16 +147,7 @@ export default function Layout() {
           <div className="flex h-16 justify-between">
             <div className="flex">
               <div className="flex shrink-0 items-center mr-6">
-                <img
-                  alt="Your Company"
-                  src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
-                  className="block h-8 w-auto lg:hidden"
-                />
-                <img
-                  alt="Your Company"
-                  src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
-                  className="hidden h-8 w-auto lg:block"
-                />
+                <Logo className="size-8" />
               </div>
               {/* TODO: Re-enable when we support multiple organizations */}
               <div className="flex items-center">
@@ -201,12 +194,25 @@ export default function Layout() {
                   <DropdownMenuContent className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 ring-1 shadow-lg ring-black/5 transition focus:outline-hidden data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-200 data-enter:ease-out data-leave:duration-75 data-leave:ease-in">
                     {userNavigation.map((item) => (
                       <DropdownMenuItem key={item.name}>
-                        <a
-                          href={item.href}
-                          className="block px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
-                        >
-                          {item.name}
-                        </a>
+                        {item.name === "Sign out" ? (
+                          <Form method="post" action="/logout">
+                            <AuthenticityTokenInput />
+                            <HoneypotInputs />
+                            <button
+                              type="submit"
+                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
+                            >
+                              {item.name}
+                            </button>
+                          </Form>
+                        ) : (
+                          <a
+                            href={item.href}
+                            className="block px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
+                          >
+                            {item.name}
+                          </a>
+                        )}
                       </DropdownMenuItem>
                     ))}
                   </DropdownMenuContent>
@@ -270,13 +276,26 @@ export default function Layout() {
                       </div>
                       <div className="mt-3 space-y-1">
                         {userNavigation.map((item) => (
-                          <Link
-                            key={item.name}
-                            to={item.href}
-                            className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                          >
-                            {item.name}
-                          </Link>
+                          item.name === "Sign out" ? (
+                            <Form key={item.name} method="post" action="/logout">
+                              <AuthenticityTokenInput />
+                              <HoneypotInputs />
+                              <button
+                                type="submit"
+                                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                              >
+                                {item.name}
+                              </button>
+                            </Form>
+                          ) : (
+                            <Link
+                              key={item.name}
+                              to={item.href}
+                              className="block px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                            >
+                              {item.name}
+                            </Link>
+                          )
                         ))}
                       </div>
                     </div>
@@ -439,7 +458,7 @@ function FeedbackButton() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button variant="outline" className="m-1">
+        <Button variant="outline" className="m-1 h-9 hover:shadow-none">
           Leave Feedback
         </Button>
       </PopoverTrigger>
