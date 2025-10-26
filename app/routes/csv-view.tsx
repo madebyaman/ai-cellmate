@@ -194,16 +194,15 @@ export default function CSVView() {
   const [enrichedCells, setEnrichedCells] =
     useState<Record<string, Record<string, string>>>(initialEnrichedCells);
   const [processingRowId, setProcessingRowId] = useState<string | null>(null);
-  const [completedRowIds, setCompletedRowIds] = useState<Set<string>>(
-    new Set(initialCompletedRowIds || []),
+  const [completedRowCount, setCompletedRowCount] = useState(
+    initialCompletedRowIds?.length || 0,
   );
   const processedEventCountRef = useRef(0);
   const processingRowRef = useRef<HTMLTableRowElement>(null);
   const totalRows = cachedData.rows.length;
 
   // Derived states
-  const completedRows = completedRowIds.size;
-  const progress = Math.round((completedRows / totalRows) * 100);
+  const progress = Math.round((completedRowCount / totalRows) * 100);
   const [stages, setStages] = useState<
     Array<{ name: string; status: "pending" | "in-progress" | "completed" }>
   >([
@@ -319,7 +318,7 @@ export default function CSVView() {
 
           case "row-complete":
             setProcessingRowId(null);
-            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            setCompletedRowCount((prev) => prev + 1);
             break;
 
           case "row-retrying":
@@ -337,7 +336,7 @@ export default function CSVView() {
 
           case "row-failed":
             setProcessingRowId(null);
-            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            setCompletedRowCount((prev) => prev + 1);
             toast.error("Row enrichment failed", {
               description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
             });
@@ -345,7 +344,7 @@ export default function CSVView() {
 
           case "row-skipped":
             setProcessingRowId(null);
-            setCompletedRowIds((prev) => new Set(prev).add(eventData.rowId));
+            setCompletedRowCount((prev) => prev + 1);
             toast.info("Row skipped", {
               description: `Row ${eventData.rowPosition}: ${eventData.reason}`,
             });
@@ -375,7 +374,7 @@ export default function CSVView() {
     }
 
     processedEventCountRef.current = eventQueue.length;
-  }, [eventQueue, completedRowIds.size]);
+  }, [eventQueue]);
 
   const handleDeleteTable = () => {
     fetcher.submit({ intent: "delete-table" }, { method: "POST" });
@@ -493,7 +492,7 @@ export default function CSVView() {
                   <div className="text-sm text-gray-600">
                     {progress === 100
                       ? `${cachedData.rows.length} of ${cachedData.rows.length} rows processed`
-                      : `Processing row ${completedRows + 1} of ${cachedData.rows.length}`}
+                      : `Processing row ${completedRowCount + 1} of ${cachedData.rows.length}`}
                   </div>
                 </div>
               </div>
