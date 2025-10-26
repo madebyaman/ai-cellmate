@@ -135,16 +135,23 @@ export const bulkCrawlWebsites = async (
       try {
         const response = await fetch(url);
 
-        if (response.ok) {
-          const html = await response.text();
-          const { content, links } = extractArticleText(html);
-          console.log(`[SCRAPING] [${index}/${total}] SUCCESS: ${content.length} chars scraped`);
+        if (!response.ok) {
+          // Skip scraping for non-200 responses
+          console.log(`[SCRAPING] [${index}/${total}] SKIPPED: Non-200 response (${response.status} ${response.statusText})`);
           return {
-            success: true,
-            data: content,
-            links,
+            success: false,
+            error: `Skipped: Non-200 response (${response.status} ${response.statusText})`,
           };
         }
+
+        const html = await response.text();
+        const { content, links } = extractArticleText(html);
+        console.log(`[SCRAPING] [${index}/${total}] SUCCESS: ${content.length} chars scraped`);
+        return {
+          success: true,
+          data: content,
+          links,
+        };
       } catch (customError) {
         // Custom scraper failed, fall back to ScrapingBee
         console.log(`[SCRAPING] [${index}/${total}] FAILED: ${customError instanceof Error ? customError.message : 'Unknown error'}, trying ScrapingBee`);

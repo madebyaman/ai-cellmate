@@ -50,31 +50,34 @@ export const runAgentLoop = async (
   // Step 1: Prepare the system context
   const context = new SystemContext(row, headers);
 
+  // Create row prefix for logging
+  const rowPrefix = rowPosition ? `[ROW ${rowPosition}]` : "[AGENT LOOP]";
+
   console.log(
-    `[AGENT LOOP] Starting enrichment for row with ${context.getMissingColumns().length} missing columns`,
+    `${rowPrefix} Starting enrichment for row with ${context.getMissingColumns().length} missing columns`,
   );
   console.log(
-    `[AGENT LOOP] Prompt: ${prompt?.substring(0, 100)}${prompt && prompt.length > 100 ? "..." : ""}`,
+    `${rowPrefix} Prompt: ${prompt?.substring(0, 100)}${prompt && prompt.length > 100 ? "..." : ""}`,
   );
   console.log(
-    `[AGENT LOOP] Websites: ${websites.length > 0 ? websites.join(", ") : "none"}`,
+    `${rowPrefix} Websites: ${websites.length > 0 ? websites.join(", ") : "none"}`,
   );
 
   while (!context.shouldStop() && !context.isRowComplete()) {
     const currentCycle = context.getCurrentCycle();
     const maxCycles = 2;
     console.log(
-      `\n[CYCLE ${currentCycle + 1}/${maxCycles}] Starting enrichment cycle`,
+      `\n${rowPrefix} [CYCLE ${currentCycle + 1}/${maxCycles}] Starting enrichment cycle`,
     );
     console.log(
-      `[CYCLE ${currentCycle + 1}] Missing columns: ${context.getMissingColumns().join(", ")}`,
+      `${rowPrefix} [CYCLE ${currentCycle + 1}] Missing columns: ${context.getMissingColumns().join(", ")}`,
     );
 
     // Check for cancellation before starting cycle
     if (runId) {
       const isCancelled = await checkCancellationFlag(runId);
       if (isCancelled) {
-        console.log(`[AGENT LOOP] Cancellation detected for run ${runId}`);
+        console.log(`${rowPrefix} Cancellation detected for run ${runId}`);
         throw new Error("Enrichment cancelled by user");
       }
     }
@@ -92,7 +95,7 @@ export const runAgentLoop = async (
       }
 
       // Step 2: Generate search queries using query-writer
-      console.log(`[CYCLE ${currentCycle + 1}] Generating search queries...`);
+      console.log(`${rowPrefix} [CYCLE ${currentCycle + 1}] Generating search queries...`);
       const queryResult = await queryRewriter(
         {
           row: context.getRow(),
@@ -105,12 +108,12 @@ export const runAgentLoop = async (
       );
 
       console.log(
-        `[CYCLE ${currentCycle + 1}] Generated ${queryResult.queries.length} queries`,
+        `${rowPrefix} [CYCLE ${currentCycle + 1}] Generated ${queryResult.queries.length} queries`,
       );
 
       // Step 3: Execute search queries in parallel
       console.log(
-        `[SEARCHING] Executing ${queryResult.queries.length} parallel searches`,
+        `${rowPrefix} [SEARCHING] Executing ${queryResult.queries.length} parallel searches`,
       );
       const searchPromises = queryResult.queries.map(async (query) => {
         const results = await searchSerper({ q: query, num: 3 }, undefined);
@@ -132,7 +135,7 @@ export const runAgentLoop = async (
         context.reportSearch(searchResult);
       });
 
-      console.log(`[SEARCHING] Completed ${searchResults.length} searches`);
+      console.log(`${rowPrefix} [SEARCHING] Completed ${searchResults.length} searches`);
 
       // Emit stage-complete for "Searching data"
       if (tableId) {
@@ -162,15 +165,15 @@ export const runAgentLoop = async (
       const urlsToScrape = deduplicatedUrls.slice(0, MAX_URLS_PER_CYCLE);
 
       console.log(
-        `[URL DEDUP] ${allUrls.size} URLs → ${deduplicatedUrls.length} unique URLs after dedup → ${urlsToScrape.length} URLs selected (max ${MAX_URLS_PER_CYCLE})`,
+        `${rowPrefix} [URL DEDUP] ${allUrls.size} URLs → ${deduplicatedUrls.length} unique URLs after dedup → ${urlsToScrape.length} URLs selected (max ${MAX_URLS_PER_CYCLE})`,
       );
       console.log(
-        `[URL DEDUP] Already scraped ${context.getScrapedUrls().length} URLs in previous cycles`,
+        `${rowPrefix} [URL DEDUP] Already scraped ${context.getScrapedUrls().length} URLs in previous cycles`,
       );
 
       if (urlsToScrape.length === 0) {
         console.log(
-          `[CYCLE ${currentCycle + 1}] No new URLs to scrape, ending cycle`,
+          `${rowPrefix} [CYCLE ${currentCycle + 1}] No new URLs to scrape, ending cycle`,
         );
         break;
       }
@@ -188,7 +191,7 @@ export const runAgentLoop = async (
 
       // Step 6: Scrape the URLs
       console.log(
-        `[SCRAPING] Starting ${urlsToScrape.length} parallel scrapes (concurrency: ${concurrency})`,
+        `${rowPrefix} [SCRAPING] Starting ${urlsToScrape.length} parallel scrapes (concurrency: ${concurrency})`,
       );
       const crawlResults = await bulkCrawlWebsites(
         { urls: urlsToScrape, concurrency },
@@ -199,7 +202,7 @@ export const runAgentLoop = async (
       context.addScrapedUrls(urlsToScrape);
 
       console.log(
-        `[SCRAPING] Completed: ${
+        `${rowPrefix} [SCRAPING] Completed: ${
           crawlResults.success === true
             ? `${crawlResults.results.length}/${urlsToScrape.length} successful`
             : crawlResults.success === "partial"
@@ -250,7 +253,7 @@ export const runAgentLoop = async (
 
       // Step 7: Extract results from crawled data
       console.log(
-        `[EXTRACTION] Analyzing ${crawlResults.success !== false ? crawlResults.results.filter((r) => r.success).length : 0} pages for data extraction`,
+        `${rowPrefix} [EXTRACTION] Analyzing ${crawlResults.success !== false ? crawlResults.results.filter((r) => r.success).length : 0} pages for data extraction`,
       );
       const extractedData = await extractResultsFromCrawledData(
         {
@@ -266,7 +269,7 @@ export const runAgentLoop = async (
         (key) => extractedData[key] !== undefined,
       );
       console.log(
-        `[EXTRACTION] Found values for: ${extractedColumns.length > 0 ? extractedColumns.join(", ") : "none"}`,
+        `${rowPrefix} [EXTRACTION] Found values for: ${extractedColumns.length > 0 ? extractedColumns.join(", ") : "none"}`,
       );
 
       // Emit stage-complete for "Lookups"
@@ -292,15 +295,15 @@ export const runAgentLoop = async (
 
       const stillMissing = context.getMissingColumns();
       console.log(
-        `[EXTRACTION] Still missing: ${stillMissing.length > 0 ? stillMissing.join(", ") : "none"}`,
+        `${rowPrefix} [EXTRACTION] Still missing: ${stillMissing.length > 0 ? stillMissing.join(", ") : "none"}`,
       );
       console.log(
-        `[CYCLE ${currentCycle + 1}] COMPLETE - Filled: ${extractedColumns.length}, Remaining: ${stillMissing.length}`,
+        `${rowPrefix} [CYCLE ${currentCycle + 1}] COMPLETE - Filled: ${extractedColumns.length}, Remaining: ${stillMissing.length}`,
       );
 
       // Check if we've filled all columns
       if (context.isRowComplete()) {
-        console.log(`[CYCLE ${currentCycle + 1}] Row is now complete!`);
+        console.log(`${rowPrefix} [CYCLE ${currentCycle + 1}] Row is now complete!`);
         break;
       }
 
@@ -329,7 +332,7 @@ export const runAgentLoop = async (
       }
     } catch (error) {
       console.error(
-        `[CYCLE ${currentCycle + 1}] ERROR:`,
+        `${rowPrefix} [CYCLE ${currentCycle + 1}] ERROR:`,
         JSON.stringify(error, null, 2),
       );
       // Continue to next cycle or stop if max cycles reached
@@ -347,12 +350,12 @@ export const runAgentLoop = async (
   const filledCount = totalColumns - missingCount;
 
   console.log(
-    `\n[AGENT LOOP] All cycles complete - Final success: ${missingCount === 0}`,
+    `\n${rowPrefix} All cycles complete - Final success: ${missingCount === 0}`,
   );
-  console.log(`[AGENT LOOP] Total cycles: ${totalCycles}`);
-  console.log(`[AGENT LOOP] Filled: ${filledCount}/${totalColumns} columns`);
+  console.log(`${rowPrefix} Total cycles: ${totalCycles}`);
+  console.log(`${rowPrefix} Filled: ${filledCount}/${totalColumns} columns`);
   console.log(
-    `[AGENT LOOP] Missing: ${missingCount > 0 ? context.getMissingColumns().join(", ") : "none"}`,
+    `${rowPrefix} Missing: ${missingCount > 0 ? context.getMissingColumns().join(", ") : "none"}`,
   );
 
   return {

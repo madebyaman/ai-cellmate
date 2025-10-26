@@ -25,14 +25,14 @@ Generate appropriate column names, their types (String, Number, or Boolean), and
 For each column, provide:
 - name: A clear, concise column name
 - type: The appropriate data type (String, Number, or Boolean)
-- description: A detailed description of what data should be in this column and how to find it (this will guide the AI agent during enrichment)
+- description: A clear description of what data should be in this column
 
 Examples:
-- If they want LinkedIn URLs: { name: "LinkedIn URL", type: "String", description: "The company's official LinkedIn profile URL. Search for '[Company Name] LinkedIn' and extract the URL to their company page." }
-- If they want employee count: { name: "Employee Count", type: "Number", description: "The total number of employees at the company. Look for this on their LinkedIn page, company website about page, or business databases." }
-- If they want to check if B2B: { name: "Is B2B", type: "Boolean", description: "Whether the company primarily serves other businesses (B2B) rather than consumers (B2C). Analyze their website, products/services, and target market to determine this." }
+- If they want LinkedIn URLs: { name: "LinkedIn URL", type: "String", description: "The company's official LinkedIn profile URL." }
+- If they want employee count: { name: "Employee Count", type: "Number", description: "The total number of employees at the company." }
+- If they want to check if B2B: { name: "Is B2B", type: "Boolean", description: "Whether the company primarily serves other businesses (B2B) rather than consumers (B2C)." }
 
-Generate 1-5 relevant columns based on the request. Make descriptions specific and actionable to help the AI agent know exactly what to search for and extract.`,
+Generate 1-5 relevant columns based on the request.`,
   });
 
   return result.columns;
