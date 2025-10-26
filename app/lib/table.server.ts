@@ -107,6 +107,10 @@ export async function getTableData(
           },
         },
       },
+      runs: {
+        orderBy: { createdAt: "desc" },
+      },
+      hint: true,
     },
   });
 
@@ -115,7 +119,13 @@ export async function getTableData(
   }
 
   return {
+    id: table.id,
     name: table.name,
+    uploadKey: table.uploadKey,
+    organizationId: table.organizationId,
+    createdBy: table.createdBy,
+    createdAt: table.createdAt.toISOString(),
+    updatedAt: table.updatedAt.toISOString(),
     columns: table.columns.map((col) => ({
       id: col.id,
       name: col.name,
@@ -153,6 +163,27 @@ export async function getTableData(
         })),
       })),
     })),
+    runs: table.runs.map((run) => ({
+      id: run.id,
+      tableId: run.tableId,
+      status: run.status,
+      createdAt: run.createdAt.toISOString(),
+      updatedAt: run.updatedAt.toISOString(),
+      startedAt: run.startedAt?.toISOString(),
+      finishedAt: run.finishedAt?.toISOString(),
+      error: run.error,
+    })),
+    hint: table.hint
+      ? {
+          id: table.hint.id,
+          tableId: table.hint.tableId,
+          scope: table.hint.scope,
+          prompt: table.hint.prompt,
+          websites: table.hint.websites,
+          createdAt: table.hint.createdAt.toISOString(),
+          updatedAt: table.hint.updatedAt.toISOString(),
+        }
+      : null,
   };
 }
 

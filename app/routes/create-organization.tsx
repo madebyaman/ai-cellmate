@@ -240,7 +240,7 @@ export default function CreateOrganizationPage({
           <Button
             type="submit"
             form={form.id}
-            disabled={isLoading}
+            disabled={showSpinner}
             isLoading={showSpinner}
           >
             Submit

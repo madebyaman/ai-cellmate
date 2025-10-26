@@ -197,7 +197,6 @@ export default function CSVView() {
   const [completedRowIds, setCompletedRowIds] = useState<Set<string>>(
     new Set(initialCompletedRowIds || []),
   );
-  const hasShownSuccessToastRef = useRef(false);
   const processedEventCountRef = useRef(0);
   const processingRowRef = useRef<HTMLTableRowElement>(null);
   const totalRows = cachedData.rows.length;
@@ -257,6 +256,10 @@ export default function CSVView() {
 
   // Handle incoming events with useEffect to avoid infinite renders
   useEffect(() => {
+    if (!eventQueue || typeof eventQueue.length !== "number") {
+      return;
+    }
+
     const unprocessedCount = eventQueue.length - processedEventCountRef.current;
 
     if (unprocessedCount <= 0) {
@@ -354,12 +357,9 @@ export default function CSVView() {
               prev.map((stage) => ({ ...stage, status: "completed" })),
             );
 
-            if (!hasShownSuccessToastRef.current) {
-              hasShownSuccessToastRef.current = true;
-              toast.success("Enrichment completed successfully!", {
-                description: "All rows have been processed.",
-              });
-            }
+            toast.success("Enrichment completed successfully!", {
+              description: "All rows have been processed.",
+            });
             break;
 
           case "cancelled":

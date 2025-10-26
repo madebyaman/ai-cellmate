@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (sub) throw redirect(ROUTES.DASHBOARD);
   }
 
-  return { orgsList: [], activeOrg: null };
+  return { orgsList, activeOrg };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
