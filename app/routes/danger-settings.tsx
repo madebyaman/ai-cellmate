@@ -14,7 +14,7 @@ import {
   useLoaderData,
   useActionData,
 } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { redirect } from "react-router";
 import { requireActiveOrg } from "~/utils/auth.server";
 import Heading from "~/components/ui/heading";
@@ -360,6 +360,13 @@ function DeleteProfileDialog({
     </Dialog>
   );
 }
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Danger Zone - AI Cellmate" },
+    { name: "description", content: "Permanently delete your organization or profile. This action cannot be undone." },
+  ];
+};
 
 export default function DangerSettings() {
   const { isOwner, organizationName, organizationId } =

@@ -1,7 +1,14 @@
-import { redirect, type LoaderFunctionArgs } from "react-router";
+import { redirect, type LoaderFunctionArgs, type MetaFunction } from "react-router";
 import { authClient } from "~/lib/auth-client";
 import { ROUTES } from "~/utils/constants";
 import { auth } from "~/lib/auth.server";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Accept Invitation - AI Cellmate" },
+    { name: "description", content: "Accept your team invitation to join AI Cellmate workspace." },
+  ];
+};
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);

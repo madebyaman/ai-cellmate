@@ -10,7 +10,7 @@ import {
   useLoaderData,
   useActionData,
 } from "react-router";
-import type { ActionFunctionArgs, LoaderFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from "react-router";
 import { redirect } from "react-router";
 import { auth } from "~/lib/auth.server";
 import { requireActiveOrg } from "~/utils/auth.server";
@@ -123,6 +123,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
   return redirect(returnUrl);
 }
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Team Settings - AI Cellmate" },
+    { name: "description", content: "Manage your team members and send invitations to collaborate." },
+  ];
+};
 
 export default function TeamSettings() {
   const { subscription } = useAppLayoutLoaderData();

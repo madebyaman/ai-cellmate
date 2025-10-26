@@ -1,4 +1,12 @@
 import { Link } from "react-router";
+import type { Route } from "./+types/coming-soon";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Coming Soon - AI Cellmate" },
+    { name: "description", content: "AI Cellmate is launching soon! Get ready to supercharge your data with AI-powered enrichment." },
+  ];
+}
 
 export default function ComingSoon() {
   return (

@@ -1,5 +1,13 @@
 import Heading from "~/components/ui/heading";
 import { Button } from "~/components/ui/button";
+import type { MetaFunction } from "react-router";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Profile Settings - AI Cellmate" },
+    { name: "description", content: "Update your personal information and notification preferences." },
+  ];
+};
 
 export default function ProfileSettings() {
   const user = { name: "Aman Thakur" };

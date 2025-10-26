@@ -1,5 +1,12 @@
-import { NavLink, Outlet } from "react-router";
+import { NavLink, Outlet, type MetaFunction } from "react-router";
 import LayoutWrapper from "~/components/layout-wrapper";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Settings - AI Cellmate" },
+    { name: "description", content: "Manage your account settings, billing, team members, and preferences." },
+  ];
+};
 
 const secondaryNavigation = [
   { name: "Profile & Preferences", href: "" },

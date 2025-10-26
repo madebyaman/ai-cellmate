@@ -6,8 +6,8 @@ import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "New React Router App" },
-    { name: "description", content: "Welcome to React Router!" },
+    { title: "Home - AI Cellmate" },
+    { name: "description", content: "AI Cellmate - Intelligent CSV data enrichment with AI-powered web search and automated data discovery." },
   ];
 }
 

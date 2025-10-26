@@ -8,6 +8,7 @@ import {
   useLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
+  type MetaFunction,
 } from "react-router";
 import { format } from "date-fns";
 import LayoutWrapper from "~/components/layout-wrapper";
@@ -28,6 +29,13 @@ import {
 import { generateEnrichmentColumns } from "~/lib/ai-column-generator.server";
 import { uploadAndProcessCSV } from "~/lib/csv-upload.server";
 // import { verifyUserAccessToOrganization } from "~/utils/organization.server";
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Dashboard - AI Cellmate" },
+    { name: "description", content: "View and manage your CSV data enrichment projects with AI-powered intelligence." },
+  ];
+};
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { activeOrg } = await requireActiveOrg(request);

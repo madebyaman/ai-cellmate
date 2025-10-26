@@ -1,4 +1,12 @@
 import { Link } from "react-router";
+import type { Route } from "./+types/terms";
+
+export function meta({}: Route.MetaArgs) {
+  return [
+    { title: "Terms of Service - AI Cellmate" },
+    { name: "description", content: "Terms of Service for AI Cellmate - AI-powered CSV data enrichment service." },
+  ];
+}
 
 export default function Terms() {
   return (

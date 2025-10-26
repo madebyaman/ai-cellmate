@@ -213,7 +213,10 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
 }
 
 export const meta: MetaFunction = () => {
-  return [{ title: "Login to Praise Panda" }];
+  return [
+    { title: "Login - AI Cellmate" },
+    { name: "description", content: "Sign in to your AI Cellmate account to start enriching your CSV data with AI-powered intelligence." },
+  ];
 };
 
 export function ErrorBoundary() {

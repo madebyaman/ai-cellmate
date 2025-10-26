@@ -1,5 +1,5 @@
 import { Calendar, Plus } from "lucide-react";
-import type { ActionFunctionArgs } from "react-router";
+import type { ActionFunctionArgs, MetaFunction } from "react-router";
 import { Form, redirect, UNSAFE_invariant, useNavigation } from "react-router";
 import { format } from "date-fns";
 import { prisma } from "~/lib/prisma.server";
@@ -125,6 +125,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
   return redirect(returnUrl);
 }
+
+export const meta: MetaFunction = () => {
+  return [
+    { title: "Billing Settings - AI Cellmate" },
+    { name: "description", content: "Manage your subscription, credits, and billing information." },
+  ];
+};
 
 export default function BillingSection() {
   const { credits, subscription } = useAppLayoutLoaderData();
