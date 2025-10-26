@@ -62,7 +62,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     ref,
   ) => {
     const baseClasses =
-      "inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium shadow-sm transition-all duration-200 hover:shadow outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 disabled:pointer-events-none disabled:opacity-50 cursor-pointer";
+      "relative inline-flex justify-center rounded-md text-sm font-medium shadow-sm transition-all duration-200 hover:shadow outline-none focus-visible:ring-2 focus-within:ring-2 ring-primary-400 disabled:pointer-events-none disabled:opacity-50 cursor-pointer";
 
     const classes = cn(
       baseClasses,
@@ -71,12 +71,18 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       className,
     );
 
+    const contentClasses = "inline-flex items-center gap-2";
+
     // If 'to' prop is provided or variant is 'link', render as Link
     if (to || variant === "link") {
       return (
         <Link to={to || "#"} className={classes} {...(props as any)}>
-          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-          <span className={isLoading ? "invisible" : ""}>{children}</span>
+          {isLoading && (
+            <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />
+          )}
+          <span className={cn(contentClasses, isLoading && "invisible")}>
+            {children}
+          </span>
         </Link>
       );
     }
@@ -88,8 +94,12 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}
       >
-        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
-        <span className={isLoading ? "invisible" : ""}>{children}</span>
+        {isLoading && (
+          <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-4 w-4 animate-spin" />
+        )}
+        <span className={cn(contentClasses, isLoading && "invisible")}>
+          {children}
+        </span>
       </button>
     );
   },
