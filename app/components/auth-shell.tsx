@@ -1,5 +1,6 @@
 import { type ReactNode } from "react";
 import { cn } from "~/utils/misc";
+import { Logo } from "~/components/ui/logo";
 
 export function AuthShell({
   children,
@@ -117,16 +118,7 @@ AuthShell.CTA = CTA;
 function AuthLogo({ className }: { className?: string }) {
   return (
     <div className={cn("flex shrink-0 items-center justify-center", className)}>
-      <img
-        alt="Your Company"
-        src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
-        className="block h-8 w-auto lg:hidden"
-      />
-      <img
-        alt="Your Company"
-        src="https://tailwindui.com/plus-assets/img/logos/mark.svg?color=indigo&shade=600"
-        className="hidden h-8 w-auto lg:block"
-      />
+      <Logo size={32} />
     </div>
   );
 }

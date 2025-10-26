@@ -75,7 +75,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     if (to || variant === "link") {
       return (
         <Link to={to || "#"} className={classes} {...(props as any)}>
-          {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+          {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+          <span className={isLoading ? "invisible" : ""}>{children}</span>
         </Link>
       );
     }
@@ -87,7 +88,8 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         {...props}
       >
-        {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : children}
+        {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
+        <span className={isLoading ? "invisible" : ""}>{children}</span>
       </button>
     );
   },
