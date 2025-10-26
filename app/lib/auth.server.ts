@@ -2,15 +2,16 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.server";
 import { magicLink, organization } from "better-auth/plugins";
-import { stripe } from "@better-auth/stripe";
 import sendEmail from "~/utils/email.server";
-// import Stripe from "stripe";
 import { BOOSTER_PLAN_NAME, PLANS } from "~/utils/constants";
 import { createCustomer } from "./stripe.server";
 
 // const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
 
 export const auth = betterAuth({
+  appName: "AI Cellmate",
+  baseURL: process.env.BASE_URL,
+  secret: process.env.BETTER_AUTH_SECRET,
   session: {
     cookieCache: {
       enabled: true,
