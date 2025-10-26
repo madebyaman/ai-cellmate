@@ -35,13 +35,6 @@ import {
 } from "~/utils/auth.server";
 import { CHANGE_WORKSPACE_FORM, INTENTS, ROUTES } from "~/utils/constants";
 
-const user = {
-  name: "Tom Cook",
-  email: "tom@example.com",
-  imageUrl:
-    "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80",
-};
-
 const navigation = [
   {
     name: "Dashboard",
@@ -66,7 +59,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     getOrganizationCredits(request, activeOrg.id),
   ]);
 
-  return { activeOrg, user, subscription, credits, orgsList };
+  return { activeOrg, user: user.user, subscription, credits, orgsList };
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -137,7 +130,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Layout() {
-  const { activeOrg, orgsList, subscription, credits } =
+  const { activeOrg, orgsList, subscription, credits, user } =
     useLoaderData<typeof loader>();
 
   return (
@@ -185,11 +178,7 @@ export default function Layout() {
                   <DropdownMenuTrigger className="relative flex max-w-xs items-center rounded-full bg-white text-sm focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 focus:outline-hidden">
                     <span className="absolute -inset-1.5" />
                     <span className="sr-only">Open user menu</span>
-                    <img
-                      alt=""
-                      src={user.imageUrl}
-                      className="size-8 rounded-full"
-                    />
+                    <UserAvatar user={user} size="sm" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent className="absolute right-0 z-10 mt-2 w-48 origin-top-right rounded-md bg-white py-1 ring-1 shadow-lg ring-black/5 transition focus:outline-hidden data-closed:scale-95 data-closed:transform data-closed:opacity-0 data-enter:duration-200 data-enter:ease-out data-leave:duration-75 data-leave:ease-in">
                     {userNavigation.map((item) => (
@@ -259,11 +248,7 @@ export default function Layout() {
                     <div className="border-t border-gray-200 pt-4 pb-3">
                       <div className="flex items-center px-4">
                         <div className="shrink-0">
-                          <img
-                            alt=""
-                            src={user.imageUrl}
-                            className="size-10 rounded-full"
-                          />
+                          <UserAvatar user={user} size="md" />
                         </div>
                         <div className="ml-3">
                           <div className="text-base font-medium text-gray-800">
@@ -275,9 +260,13 @@ export default function Layout() {
                         </div>
                       </div>
                       <div className="mt-3 space-y-1">
-                        {userNavigation.map((item) => (
+                        {userNavigation.map((item) =>
                           item.name === "Sign out" ? (
-                            <Form key={item.name} method="post" action="/logout">
+                            <Form
+                              key={item.name}
+                              method="post"
+                              action="/logout"
+                            >
                               <AuthenticityTokenInput />
                               <HoneypotInputs />
                               <button
@@ -295,8 +284,8 @@ export default function Layout() {
                             >
                               {item.name}
                             </Link>
-                          )
-                        ))}
+                          ),
+                        )}
                       </div>
                     </div>
                   </div>
@@ -473,4 +462,44 @@ export function useAppLayoutLoaderData() {
   const data = useRouteLoaderData<typeof loader>("routes/layout");
   UNSAFE_invariant(data, "No data found");
   return data;
+}
+
+function UserAvatar({
+  user,
+  size = "sm",
+}: {
+  user: { name: string; image?: string | null | undefined };
+  size?: "sm" | "md";
+}) {
+  const getInitials = (name: string) => {
+    const parts = name.trim().split(" ");
+    if (parts.length === 0) return "U";
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return (
+      parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
+    ).toUpperCase();
+  };
+
+  const sizeClasses = size === "sm" ? "size-8" : "size-10";
+  const textSizeClasses = size === "sm" ? "text-sm" : "text-base";
+
+  if (user.image) {
+    return (
+      <img
+        alt={user.name}
+        src={user.image}
+        className={`${sizeClasses} rounded-full`}
+      />
+    );
+  }
+
+  return (
+    <div
+      className={`${sizeClasses} rounded-full bg-primary-100 flex items-center justify-center`}
+    >
+      <span className={`${textSizeClasses} font-semibold text-primary-700`}>
+        {getInitials(user.name)}
+      </span>
+    </div>
+  );
 }
