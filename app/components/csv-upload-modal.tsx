@@ -34,9 +34,11 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
   const [websites, setWebsites] = useState<string[]>([]);
 
   const isGenerating =
-    fetcher.state !== "idle" && fetcher.formData?.get("intent") === "generate-columns";
+    fetcher.state !== "idle" &&
+    fetcher.formData?.get("intent") === "generate-columns";
   const isUploading =
-    fetcher.state !== "idle" && fetcher.formData?.get("intent") === "upload-csv";
+    fetcher.state !== "idle" &&
+    fetcher.formData?.get("intent") === "upload-csv";
 
   // Handle AI column generation response
   if (
@@ -87,11 +89,17 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
       formData.append("aiPrompt", aiPrompt);
     }
 
-    fetcher.submit(formData, { method: "POST", encType: "multipart/form-data" });
+    fetcher.submit(formData, {
+      method: "POST",
+      encType: "multipart/form-data",
+    });
   };
 
   const addManualColumn = () => {
-    setManualColumns([...manualColumns, { name: "", type: "String", description: "" }]);
+    setManualColumns([
+      ...manualColumns,
+      { name: "", type: "String", description: "" },
+    ]);
   };
 
   const updateManualColumn = (
@@ -246,7 +254,10 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
                   Generated Columns (you can edit/remove)
                 </Label>
                 {generatedColumns.map((column, index) => (
-                  <div key={index} className="space-y-2 p-3 border border-gray-200 rounded-md">
+                  <div
+                    key={index}
+                    className="space-y-2 p-3 border border-gray-200 rounded-md"
+                  >
                     <div className="flex gap-2">
                       <Input
                         value={column.name}
@@ -280,7 +291,11 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
                     <Textarea
                       value={column.description}
                       onChange={(e) =>
-                        updateGeneratedColumn(index, "description", e.target.value)
+                        updateGeneratedColumn(
+                          index,
+                          "description",
+                          e.target.value,
+                        )
                       }
                       placeholder="Description of what data to find and how..."
                       rows={2}
@@ -311,7 +326,10 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
 
             <div className="space-y-3">
               {manualColumns.map((column, index) => (
-                <div key={index} className="space-y-2 p-3 border border-gray-200 rounded-md">
+                <div
+                  key={index}
+                  className="space-y-2 p-3 border border-gray-200 rounded-md"
+                >
                   <div className="flex gap-2">
                     <Input
                       value={column.name}
@@ -348,7 +366,7 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
                     onChange={(e) =>
                       updateManualColumn(index, "description", e.target.value)
                     }
-                    placeholder="Description: What data should this column contain and how to find it..."
+                    placeholder="Description: What data should this column contain"
                     rows={2}
                     className="text-sm"
                     required
@@ -427,7 +445,6 @@ export function CSVUploadModal({ isOpen, onClose }: CSVUploadModalProps) {
             </p>
           )}
         </div>
-
       </form>
     </Drawer>
   );
