@@ -10,7 +10,12 @@ npx prisma migrate deploy
 if [ $? -eq 0 ]; then
   echo "======================================"
   echo "Migrations completed successfully!"
-  echo "Starting application..."
+  echo "Starting worker process..."
+  echo "======================================"
+  npm run start:workers &
+
+  echo "======================================"
+  echo "Starting application server..."
   echo "======================================"
   npm run start
 else
