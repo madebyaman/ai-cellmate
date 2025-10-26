@@ -27,9 +27,12 @@ COPY --from=production-dependencies-env /app/node_modules /app/node_modules
 COPY --from=build-env /app/build /app/build
 COPY --from=build-env /app/node_modules/@prisma-app /app/node_modules/@prisma-app
 COPY prisma /app/prisma
+COPY start.sh /app/start.sh
 WORKDIR /app
+
+RUN chmod +x /app/start.sh
 
 EXPOSE 3000
 
 ENTRYPOINT ["dumb-init", "--"]
-CMD ["npm", "run", "start"]
+CMD ["/app/start.sh"]
