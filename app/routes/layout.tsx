@@ -54,6 +54,18 @@ const userNavigation = [
 export async function loader({ request }: LoaderFunctionArgs) {
   const { activeOrg, user, orgsList } = await requireActiveOrg(request);
 
+  // In DEV_MODE, provide mock subscription and credits to hide the banner
+  // This is consistent with validateSubscriptionAndCredits allowing operations in DEV_MODE
+  if (process.env.DEV_MODE === "true") {
+    return {
+      activeOrg,
+      user: user.user,
+      subscription: { id: "dev-mock" },
+      credits: 1000,
+      orgsList,
+    };
+  }
+
   const [subscription, credits] = await Promise.all([
     getSubscription(request, activeOrg.id),
     getOrganizationCredits(request, activeOrg.id),
