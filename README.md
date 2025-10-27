@@ -6,7 +6,7 @@ autonomous ai agents that search, scrape, and enrich csv data using multi-cycle 
 
 ## demo
 
-![ai cellmate demo](video.mp4)
+<video src="https://github.com/user-attachments/assets/7a4876ac-14c0-4c93-9d4a-2cdaa46480a5" controls width="600"></video>
 
 upload csv → agents search and scrape missing data → watch real-time progress → download enriched csv
 
@@ -17,6 +17,7 @@ upload csv → agents search and scrape missing data → watch real-time progres
 full-stack csv enrichment platform using ai agents. agents run in background workers, stream progress via redis pub/sub + sse, and use multi-cycle loops to fill missing data.
 
 built to showcase:
+
 - multi-agent ai orchestration with langfuse telemetry
 - real-time streaming (redis pub/sub + server-sent events)
 - background job processing (bullmq workers)
@@ -122,18 +123,21 @@ runs up to 2 enrichment cycles per csv row.
 **real-time progress streaming**
 
 **publisher** (`app/lib/redis-event-publisher.ts`):
+
 - singleton redis client
 - publishes events to `enrichment:{tableId}` channel
 - 11 event types: `row-start`, `stage-start`, `cell-update`, `row-complete`, etc.
 - graceful degradation if redis fails
 
 **subscriber** (`app/routes/csv-view.$tableId.stream.tsx`):
+
 - creates redis subscriber per browser client
 - subscribes to table-specific channel
 - streams events via sse endpoint
 - auto cleanup on disconnect
 
 **client** (`app/routes/csv-view.tsx`):
+
 - eventsource connection
 - updates ui in real-time based on events
 - multiple clients can watch same enrichment
@@ -146,17 +150,20 @@ runs up to 2 enrichment cycles per csv row.
 **file**: `app/queues/workers/csv-enrichment.worker.ts`
 
 **queue** (bullmq + redis):
+
 - persistent job storage
 - each enrichment run = one job
 - retry logic and error handling
 
 **worker process**:
+
 - separate node process (`worker.ts`)
 - production: compiled with tsup
 - development: runs with tsx
 - sequential processing (concurrency: 1)
 
 **workflow**:
+
 1. fetch csv data from database
 2. for each row:
    - publish `row-start` event
@@ -168,6 +175,7 @@ runs up to 2 enrichment cycles per csv row.
 4. publish `complete` event
 
 **cancellation** (`app/lib/enrichment-cancellation.server.ts`):
+
 - sets redis flag `cancel:{runId}`
 - agent loop checks flag before each operation
 - graceful shutdown
@@ -213,6 +221,7 @@ npm run dev
 runs web server (port 5173) + worker process
 
 **production**:
+
 ```bash
 npm run build
 npm start              # web server
