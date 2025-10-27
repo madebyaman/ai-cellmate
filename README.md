@@ -6,7 +6,7 @@ autonomous ai agents that search, scrape, and enrich csv data using multi-cycle 
 
 ## demo
 
-*demo video will be here*
+![ai cellmate demo](video.mp4)
 
 upload csv → agents search and scrape missing data → watch real-time progress → download enriched csv
 
