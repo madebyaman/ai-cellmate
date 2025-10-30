@@ -35,7 +35,7 @@ export function GlobalLoading() {
       <div
         ref={ref}
         className={cx(
-          "h-full bg-gradient-to-r from-primary-600 via-cyan-500 to-emerald-400 transition-all duration-500 ease-in-out",
+          "h-full bg-gradient-to-r from-primary-400 to-primary-600 transition-all duration-500 ease-in-out",
           transition.state === "idle" &&
             (animating ? "w-full" : "w-0 opacity-0 transition-none"),
           transition.state === "submitting" && "w-4/12",
