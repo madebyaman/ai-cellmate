@@ -5,6 +5,7 @@ import { useEffect } from "react";
 import {
   redirect,
   useFetcher,
+  useLoaderData,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from "react-router";
@@ -133,11 +134,9 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
   return { submission: null, shouldClearForm };
 }
 
-export default function CreateOrganizationPage({
-  actionData,
-  loaderData,
-}: Route.ComponentProps) {
-  let fetcher = useFetcher();
+export default function CreateOrganizationPage() {
+  const loaderData = useLoaderData<typeof loader>();
+  let fetcher = useFetcher<typeof clientAction>();
   let isLoading = fetcher.state !== "idle";
   const showSpinner = useSpinDelay(isLoading, {
     delay: 100,
@@ -146,7 +145,7 @@ export default function CreateOrganizationPage({
 
   const [form, fields] = useForm({
     shouldValidate: "onBlur",
-    lastResult: actionData?.submission,
+    lastResult: fetcher.data?.submission,
     shouldRevalidate: "onInput",
     defaultValue: {
       userName: loaderData?.user?.name || "",
@@ -157,10 +156,10 @@ export default function CreateOrganizationPage({
   });
 
   useEffect(() => {
-    if (actionData?.shouldClearForm) {
+    if (fetcher.data?.shouldClearForm) {
       form.reset();
     }
-  }, [actionData?.shouldClearForm]);
+  }, [fetcher.data?.shouldClearForm]);
 
   return (
     <AuthShell className="flex justify-center" innerClassName="w-full">
