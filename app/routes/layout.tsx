@@ -66,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return {
     activeOrg,
     user: user.user,
-    subscription: isDevMode ? { id: "mock" } : subscription,
+    subscription: isDevMode ? ({ id: "mock" } as const) : subscription,
     credits: isDevMode ? 1000 : credits,
     orgsList,
   };
@@ -139,12 +139,18 @@ export async function action({ request }: ActionFunctionArgs) {
   return null;
 }
 
+const LOGOUT_FORM_ID = "logout-form";
+
 export default function Layout() {
   const { activeOrg, orgsList, subscription, credits, user } =
     useLoaderData<typeof loader>();
 
   return (
     <div className="h-full flex flex-col">
+      <Form method="post" action="/logout" id={LOGOUT_FORM_ID}>
+        <AuthenticityTokenInput />
+        <HoneypotInputs />
+      </Form>
       <nav className="border-b border-gray-200 bg-white sticky top-0">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex h-16 justify-between">
@@ -194,16 +200,13 @@ export default function Layout() {
                     {userNavigation.map((item) => (
                       <DropdownMenuItem key={item.name}>
                         {item.name === "Sign out" ? (
-                          <Form method="post" action="/logout">
-                            <AuthenticityTokenInput />
-                            <HoneypotInputs />
-                            <button
-                              type="submit"
-                              className="block w-full text-left px-4 py-2 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden"
-                            >
-                              {item.name}
-                            </button>
-                          </Form>
+                          <button
+                            type="submit"
+                            form={LOGOUT_FORM_ID}
+                            className="block w-full text-left px-4 py-1 text-sm text-gray-700 data-focus:bg-gray-100 data-focus:outline-hidden cursor-pointer"
+                          >
+                            {item.name}
+                          </button>
                         ) : (
                           <a
                             href={item.href}
@@ -272,20 +275,13 @@ export default function Layout() {
                       <div className="mt-3 space-y-1">
                         {userNavigation.map((item) =>
                           item.name === "Sign out" ? (
-                            <Form
-                              key={item.name}
-                              method="post"
-                              action="/logout"
+                            <button
+                              type="submit"
+                              form={LOGOUT_FORM_ID}
+                              className="block w-full text-left px-4 py-1 text-sm font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
                             >
-                              <AuthenticityTokenInput />
-                              <HoneypotInputs />
-                              <button
-                                type="submit"
-                                className="block w-full text-left px-4 py-2 text-base font-medium text-gray-500 hover:bg-gray-100 hover:text-gray-800"
-                              >
-                                {item.name}
-                              </button>
-                            </Form>
+                              {item.name}
+                            </button>
                           ) : (
                             <Link
                               key={item.name}
