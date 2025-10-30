@@ -50,6 +50,15 @@ export async function clientAction({ request }: Route.ClientActionArgs) {
       submission: null,
       shouldClearForm: false,
     };
+  } else if (submission.value.provider === "github") {
+    authClient.signIn.social({
+      provider: "github",
+      callbackURL: ROUTES.DASHBOARD,
+    });
+    return {
+      submission: null,
+      shouldClearForm: false,
+    };
   } else if (submission.value.provider === "email") {
     let shouldClearForm = false;
     const userEmail = submission.value.email;
@@ -186,7 +195,8 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
                     </svg>
                   </Button>
                 </Form>
-                <Form method="POST" action="/auth/github">
+                <Form method="POST">
+                  <input type="hidden" name="provider" value="github" />
                   <Button variant={"outline"} size={"full"}>
                     <span className="sr-only">Sign in with GitHub</span>
                     <svg
@@ -215,7 +225,11 @@ export default function LoginPage({ actionData }: Route.ComponentProps) {
 export const meta: MetaFunction = () => {
   return [
     { title: "Login - AI Cellmate" },
-    { name: "description", content: "Sign in to your AI Cellmate account to start enriching your CSV data with AI-powered intelligence." },
+    {
+      name: "description",
+      content:
+        "Sign in to your AI Cellmate account to start enriching your CSV data with AI-powered intelligence.",
+    },
   ];
 };
 
