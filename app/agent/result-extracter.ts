@@ -65,38 +65,39 @@ interface ExtractionInput {
   crawledData: BulkCrawlResponse;
 }
 
-export const extractResultsFromCrawledData = async (
-  input: ExtractionInput,
+interface CrawledPage {
+  url: string;
+  success: boolean;
+  content: string;
+  links: string[];
+}
+
+// Helper function to extract from a batch of pages
+const extractFromContentBatch = async (
+  batch: CrawledPage[],
+  row: Record<string, string>,
+  headers: string[],
+  missingColumns: string[],
+  batchIndex: number,
+  totalBatches: number,
   reportUsage: (functionId: string, usage: any) => void,
-  opts: { langfuseTraceId?: string } = {},
+  langfuseTraceId?: string,
 ): Promise<ResultExtractorResult> => {
-  const { row, headers, crawledData } = input;
-
-  // Identify missing or empty columns
-  const missingColumns = headers.filter(
-    (header) =>
-      !row[header] || row[header].trim() === "" || row[header] === "-",
-  );
-
-  console.log(
-    `[EXTRACTION] Analyzing content for ${missingColumns.length} missing columns: ${missingColumns.join(", ")}`,
-  );
-  console.log(
-    `[EXTRACTION] Using Gemini 2.0 Flash (1M context) for large content processing`,
-  );
-
-  // Format crawled data for the prompt
-  const crawledContent = crawledData.success
-    ? crawledData.results.map((result) => ({
-        url: result.url,
-        success: result.success,
-        content: result.success ? result.result : `Error: ${result.result}`,
-        links: result.success ? result.links : [],
-      }))
-    : [];
-
   // Create schema dynamically based on missing columns
   const dynamicSchema = createResultExtractorSchema(missingColumns);
+
+  const batchContent = batch.map((page, index) => `
+--- Page ${index + 1} (Batch ${batchIndex}/${totalBatches}) ---
+URL: ${page.url}
+Status: ${page.success ? "Success" : "Failed"}
+Content:
+${page.content}
+${
+  page.links && page.links.length > 0
+    ? `Additional Links Found: ${page.links.slice(0, 5).join(", ")}${page.links.length > 5 ? "..." : ""}`
+    : ""
+}
+`);
 
   const result = await generateObject({
     model: openai("gpt-5-nano"),
@@ -144,28 +145,8 @@ ${JSON.stringify(headers)}
 Missing/Empty Columns to Fill:
 ${missingColumns.length > 0 ? missingColumns.join(", ") : "None - all columns are filled"}
 
-Crawled Webpage Content:
-${
-  crawledContent.length > 0
-    ? crawledContent
-        .map(
-          (page, index) => `
---- Page ${index + 1} ---
-URL: ${page.url}
-Status: ${page.success ? "Success" : "Failed"}
-Content:
-${page.content}
-${
-  page.links && page.links.length > 0
-    ? `
-Additional Links Found: ${page.links.slice(0, 5).join(", ")}${page.links.length > 5 ? "..." : ""}`
-    : ""
-}
-`,
-        )
-        .join("\n")
-    : "No crawled content available"
-}
+Crawled Webpage Content (Batch ${batchIndex}/${totalBatches}):
+${batchContent.join("\n")}
 
 Analyze the crawled webpage content above and extract specific data to fill the missing CSV columns.
 
@@ -176,29 +157,106 @@ For each missing column you can fill, provide:
 
 Focus on extracting factual, specific information that directly answers what each missing column is asking for. Only extract data for columns that are actually missing or empty.
 `,
-    experimental_telemetry: opts.langfuseTraceId
+    experimental_telemetry: langfuseTraceId
       ? {
           isEnabled: true,
-          functionId: "result-extracter",
+          functionId: `result-extracter-batch-${batchIndex}`,
           metadata: {
-            langfuseTraceId: opts.langfuseTraceId,
+            langfuseTraceId,
+            batchIndex,
           },
         }
       : undefined,
   });
 
   if (result.usage) {
-    reportUsage("result-extracter", result.usage);
+    reportUsage(`result-extracter-batch-${batchIndex}`, result.usage);
   }
 
-  const validated = validateResultExtractorOutput(result.object);
+  return validateResultExtractorOutput(result.object);
+};
 
-  const extractedColumns = Object.keys(validated).filter(
-    (key) => validated[key] !== undefined,
+export const extractResultsFromCrawledData = async (
+  input: ExtractionInput,
+  reportUsage: (functionId: string, usage: any) => void,
+  opts: { langfuseTraceId?: string } = {},
+): Promise<ResultExtractorResult> => {
+  const { row, headers, crawledData } = input;
+
+  // Identify missing or empty columns
+  const missingColumns = headers.filter(
+    (header) =>
+      !row[header] || row[header].trim() === "" || row[header] === "-",
+  );
+
+  console.log(
+    `[EXTRACTION] Analyzing content for ${missingColumns.length} missing columns: ${missingColumns.join(", ")}`,
+  );
+
+  // Format crawled data for processing
+  const crawledContent: CrawledPage[] = crawledData.success
+    ? crawledData.results
+        .filter((result) => result.success)
+        .map((result) => ({
+          url: result.url,
+          success: true,
+          content: result.result,
+          links: result.links || [],
+        }))
+    : [];
+
+  if (crawledContent.length === 0) {
+    console.log(`[EXTRACTION] No successful crawled content available`);
+    return {};
+  }
+
+  console.log(
+    `[EXTRACTION] Processing ${crawledContent.length} pages in parallel batches`,
+  );
+
+  // Split content into batches (4 pages per batch)
+  const BATCH_SIZE = 4;
+  const batches: CrawledPage[][] = [];
+  for (let i = 0; i < crawledContent.length; i += BATCH_SIZE) {
+    batches.push(crawledContent.slice(i, i + BATCH_SIZE));
+  }
+
+  console.log(
+    `[EXTRACTION] Executing ${batches.length} parallel extraction batches`,
+  );
+
+  // Run batch extractions in parallel
+  const batchResults = await Promise.all(
+    batches.map((batch, index) =>
+      extractFromContentBatch(
+        batch,
+        row,
+        headers,
+        missingColumns,
+        index + 1,
+        batches.length,
+        reportUsage,
+        opts.langfuseTraceId,
+      ),
+    ),
+  );
+
+  // Merge all batch results - take first successful extraction per column
+  const mergedResults: ResultExtractorResult = {};
+  for (const batchResult of batchResults) {
+    for (const [key, value] of Object.entries(batchResult)) {
+      if (value && !mergedResults[key]) {
+        mergedResults[key] = value;
+      }
+    }
+  }
+
+  const extractedColumns = Object.keys(mergedResults).filter(
+    (key) => mergedResults[key] !== undefined,
   );
   console.log(
     `[EXTRACTION] Extracted ${extractedColumns.length} column values: ${extractedColumns.join(", ")}`,
   );
 
-  return validated;
+  return mergedResults;
 };

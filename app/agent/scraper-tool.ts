@@ -94,7 +94,13 @@ const extractArticleText = (
   html: string,
 ): { content: string; links: string[] } => {
   const $ = cheerio.load(html);
+
+  // Remove non-content elements and boilerplate
   $("script, style, iframe, noscript").remove();
+  $("nav, header, footer, aside").remove();
+  $("[class*='sidebar'], [class*='advertisement'], [class*='ads']").remove();
+  $("[class*='cookie'], [class*='popup'], [class*='modal'], [class*='menu']").remove();
+  $("[role='navigation'], [role='complementary']").remove();
 
   // Extract all links before converting to markdown
   const links: string[] = [];
@@ -105,7 +111,19 @@ const extractArticleText = (
     }
   });
 
-  const content = turndownService.turndown($("body").html() || "");
+  let content = turndownService.turndown($("body").html() || "");
+
+  // Collapse multiple consecutive newlines to max 2
+  content = content.replace(/\n{3,}/g, "\n\n");
+
+  // Remove excessive whitespace within lines
+  content = content.replace(/ {2,}/g, " ");
+
+  // Truncate to max length if needed
+  const MAX_CONTENT_LENGTH = 5000;
+  if (content.length > MAX_CONTENT_LENGTH) {
+    content = content.substring(0, MAX_CONTENT_LENGTH) + "\n\n[Content truncated for length]";
+  }
 
   return {
     content: content.trim(),
