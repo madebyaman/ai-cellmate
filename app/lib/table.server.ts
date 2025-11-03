@@ -46,6 +46,7 @@ export async function getTableStatus(tableId: string, organizationId: string) {
         select: {
           id: true,
           status: true,
+          error: true,
         },
       },
     },
@@ -57,8 +58,9 @@ export async function getTableStatus(tableId: string, organizationId: string) {
 
   const status = table.runs[0]?.status ?? "PENDING";
   const runId = table.runs[0]?.id;
+  const error = table.runs[0]?.error;
 
-  return { table, status, runId };
+  return { table, status, runId, error };
 }
 
 export async function getCompletedRowIds(

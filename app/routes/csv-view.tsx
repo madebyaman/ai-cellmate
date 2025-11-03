@@ -47,7 +47,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     throw new Response("Table not found", { status: 404 });
   }
 
-  const { table, status, runId } = tableStatusData;
+  const { table, status, runId, error } = tableStatusData;
 
   // Decide whether to use live data or cached data based on status
   let cachedData;
@@ -79,6 +79,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     cachedData,
     status,
     completedRowIds,
+    error,
   });
 }
 
@@ -169,6 +170,7 @@ export default function CSVView() {
     cachedData,
     status,
     completedRowIds: initialCompletedRowIds,
+    error,
   } = useLoaderData<typeof loader>();
   const fetcher = useFetcher();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -476,8 +478,51 @@ export default function CSVView() {
               </Button>
             </>
           )}
+
+          {/* Delete Button - show when failed */}
+          {enrichmentState === "failed" && (
+            <Button
+              variant="outline"
+              className="text-red-600 border-red-300 hover:bg-red-50"
+              onClick={() => setShowDeleteConfirm(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+              Delete
+            </Button>
+          )}
         </div>
       </div>
+
+      {/* Enrichment Error Panel - Show when failed */}
+      {enrichmentState === "failed" && (
+        <div className="mb-4">
+          <div className="rounded-lg p-4 bg-red-50 border border-red-200">
+            <div className="flex items-start gap-3">
+              <div className="text-red-600 mt-0.5">
+                <svg
+                  className="w-5 h-5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </div>
+              <div>
+                <div className="font-semibold text-red-900 mb-1">
+                  Enrichment Failed
+                </div>
+                <div className="text-sm text-red-700">
+                  {error || "An unexpected error occurred during enrichment."}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Enrichment Progress Panel - Show when processing */}
       {enrichmentState === "processing" && (
