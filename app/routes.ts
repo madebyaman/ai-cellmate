@@ -7,9 +7,8 @@ import {
 
 export default [
   // Public routes (no auth required)
-  index("routes/marketing/coming-soon.tsx"),
+  index("routes/home.tsx"),
   route("terms", "routes/marketing/terms.tsx"),
-  route("home", "routes/home.tsx"),
   route("login", "routes/login.tsx"),
   route("accept-invitation", "routes/accept-invitation.tsx"),
   route("api/auth/:path/*", "routes/api-auth.ts"),

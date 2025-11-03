@@ -61,13 +61,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     getSubscription(request, activeOrg.id),
     getOrganizationCredits(request, activeOrg.id),
   ]);
-  const isDevMode = process.env.DEV_MODE === "true";
 
   return {
     activeOrg,
     user: user.user,
-    subscription: isDevMode ? ({ id: "mock" } as const) : subscription,
-    credits: isDevMode ? 1000 : credits,
+    subscription,
+    credits,
     orgsList,
   };
 }
