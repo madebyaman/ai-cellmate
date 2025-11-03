@@ -158,7 +158,6 @@ export default function Layout() {
               <div className="flex shrink-0 items-center mr-6">
                 <Logo className="size-8" />
               </div>
-              {/* TODO: Re-enable when we support multiple organizations */}
               <div className="flex items-center">
                 <WorkspaceDropdown
                   selectedOrgId={activeOrg.id}

@@ -119,7 +119,7 @@ async function processCsvEnrichment(
     // 4. Get table hint (always exists)
     const tableHint = run.table.hint;
     if (!tableHint) {
-      throw new Error(`Table ${run.table.id} has no hint`);
+      throw new Error(`Unable to start enrichment: table configuration is missing. Please try again or contact support.`);
     }
 
     console.log(
@@ -141,7 +141,7 @@ async function processCsvEnrichment(
 
     if (!organizationId) {
       throw new Error(
-        "Could not determine organization for this enrichment job",
+        "Unable to process enrichment: organization information could not be determined. Please try again or contact support.",
       );
     }
 
@@ -159,17 +159,19 @@ async function processCsvEnrichment(
     if (creditsBalance < 1) {
       console.log(`[CREDITS] Insufficient credits - cancelling enrichment`);
 
+      const errorMsg = "You have run out of credits. Please purchase more credits to continue enrichment.";
+
       // Update Run status to FAILED
       await prisma.run.update({
         where: { id: runId },
-        data: { status: "FAILED", finishedAt: new Date() },
+        data: { status: "FAILED", error: errorMsg, finishedAt: new Date() },
       });
 
       // Publish insufficient-credits event
       await publishEnrichmentEvent(
         run.table.id,
         createEnrichmentEvent("insufficient-credits", {
-          message: "You have insufficient credits to continue enrichment",
+          message: errorMsg,
           creditsRemaining: creditsBalance,
         }),
       );
@@ -178,7 +180,7 @@ async function processCsvEnrichment(
       await sdk.shutdown();
 
       // Throw UnrecoverableError to prevent BullMQ from retrying
-      throw new UnrecoverableError("Insufficient credits for enrichment");
+      throw new UnrecoverableError(errorMsg);
     }
 
     // 5. Process each row
@@ -239,17 +241,19 @@ async function processCsvEnrichment(
           `[CREDITS] Insufficient credits at row ${i + 1} - stopping enrichment`,
         );
 
+        const errorMsg = "You have run out of credits. Please purchase more credits to continue enrichment.";
+
         // Update Run status to FAILED
         await prisma.run.update({
           where: { id: runId },
-          data: { status: "FAILED", finishedAt: new Date() },
+          data: { status: "FAILED", error: errorMsg, finishedAt: new Date() },
         });
 
         // Publish insufficient-credits event
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("insufficient-credits", {
-            message: "You have insufficient credits to continue enrichment",
+            message: errorMsg,
             creditsRemaining: rowCreditsBalance,
           }),
         );
@@ -260,7 +264,7 @@ async function processCsvEnrichment(
         await sdk.shutdown();
 
         // Throw UnrecoverableError to prevent BullMQ from retrying
-        throw new UnrecoverableError("Insufficient credits for enrichment");
+        throw new UnrecoverableError(errorMsg);
       }
 
       // Build row context from SOURCE columns
