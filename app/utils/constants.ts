@@ -73,3 +73,21 @@ export const PLANS = [
     credits: 200,
   },
 ];
+
+// Email Job Types
+export const EMAIL_JOB_TYPES = {
+  SEND_EMAIL: "send-email",
+  SEND_MAGIC_LINK: "send-magic-link",
+  SEND_BATCH_EMAIL: "send-batch-email",
+} as const;
+
+// Email Queue Configuration
+export const EMAIL_QUEUE_CONFIG = {
+  QUEUE_NAME: "email",
+  // Retry configuration
+  MAX_ATTEMPTS: 3,
+  RETRY_DELAY: 5000, // 5 seconds
+  // Backoff strategy
+  BACKOFF_TYPE: "exponential" as const,
+  BACKOFF_DELAY: 2000,
+} as const;

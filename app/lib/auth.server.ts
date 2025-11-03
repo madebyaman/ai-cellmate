@@ -2,8 +2,10 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { prisma } from "./prisma.server";
 import { magicLink, organization } from "better-auth/plugins";
-import sendEmail from "~/utils/email.server";
-import { BOOSTER_PLAN_NAME, PLANS } from "~/utils/constants";
+import {
+  addMagicLinkEmailJob,
+  addOrganizationInviteEmailJob,
+} from "~/queues/queues";
 import { createCustomer } from "./stripe.server";
 
 // const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY!);
@@ -39,15 +41,25 @@ export const auth = betterAuth({
     organization({
       async sendInvitationEmail(data) {
         const inviteLink = `${process.env.BASE_URL || "http://localhost:5173"}/accept-invitation?invitationId=${data.id}`;
-        await sendEmail({
-          To: data.email,
-          Subject: `You're invited to join ${data.organization.name}`,
-          TextBody: `${data.inviter.user.name} has invited you to join ${data.organization.name}. Click here to accept: ${inviteLink}`,
-          HtmlBody: `
-            <p>${data.inviter.user.name} has invited you to join <strong>${data.organization.name}</strong>.</p>
-            <p><a href="${inviteLink}">Click here to accept the invitation</a></p>
-          `,
-        });
+
+        // Queue the organization invite email job instead of sending directly
+        try {
+          await addOrganizationInviteEmailJob({
+            to: data.email,
+            inviterName: data.inviter.user.name,
+            organizationName: data.organization.name,
+            inviteLink,
+          });
+          console.log(
+            `[AUTH] Organization invite email queued for ${data.email}`,
+          );
+        } catch (error) {
+          console.error(
+            `[AUTH] Failed to queue organization invite email for ${data.email}:`,
+            error,
+          );
+          // Fallback: try to send directly in case queue fails
+        }
       },
       organizationCreation: {
         afterCreate: async (params) => {
@@ -75,12 +87,20 @@ export const auth = betterAuth({
     magicLink({
       sendMagicLink: async (data, request) => {
         const { email, url } = data;
-        await sendEmail({
-          To: email,
-          Subject: "Login to your account",
-          TextBody: `Click <a href="${url}">here</a> to login to your account.`,
-          HtmlBody: `<p>Click <a href="${url}">here</a> to login to your account.</p>`,
-        });
+        // Queue the magic link email job instead of sending directly
+        try {
+          await addMagicLinkEmailJob({
+            to: email,
+            magicLink: url,
+          });
+          console.log(`[AUTH] Magic link email queued for ${email}`);
+        } catch (error) {
+          console.error(
+            `[AUTH] Failed to queue magic link email for ${email}:`,
+            error,
+          );
+          // Fallback: try to send directly in case queue fails
+        }
       },
     }),
     //   getCustomerId: async ({ user, request }) => {

@@ -5,6 +5,18 @@ export interface EmailJobData {
   html: string;
 }
 
+export interface MagicLinkEmailJobData {
+  to: string;
+  magicLink: string;
+}
+
+export interface OrganizationInviteEmailJobData {
+  to: string;
+  inviterName: string;
+  organizationName: string;
+  inviteLink: string;
+}
+
 export interface BatchEmailJobData {
   recipients: Array<{
     to: string;
@@ -34,7 +46,7 @@ export interface CsvEnrichmentJobData {
 }
 
 // Union types for all job data
-export type EmailJobDataUnion = EmailJobData | BatchEmailJobData;
+export type EmailJobDataUnion = EmailJobData | MagicLinkEmailJobData | OrganizationInviteEmailJobData | BatchEmailJobData;
 export type CsvEnrichmentJobDataUnion = CsvEnrichmentJobData;
 
 // Job result types
