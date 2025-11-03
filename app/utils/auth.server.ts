@@ -108,7 +108,7 @@ export async function deductCredits(
   }
 }
 
-export type SubscriptionError = "invalid-sub" | "out-of-credits";
+export type SubscriptionError = "out-of-credits";
 
 export async function validateSubscriptionAndCredits(
   request: Request,
@@ -120,15 +120,7 @@ export async function validateSubscriptionAndCredits(
     return { valid: true };
   }
 
-  const [subscription, credits] = await Promise.all([
-    getSubscription(request, orgId),
-    getOrganizationCredits(request, orgId),
-  ]);
-
-  // Check subscription first
-  if (!subscription) {
-    return { valid: false, error: "invalid-sub" };
-  }
+  const credits = await getOrganizationCredits(request, orgId);
 
   // Check credits
   if (credits < requiredCredits) {

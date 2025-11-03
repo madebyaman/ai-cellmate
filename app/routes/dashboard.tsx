@@ -33,7 +33,11 @@ import { uploadAndProcessCSV } from "~/lib/csv-upload.server";
 export const meta: MetaFunction = () => {
   return [
     { title: "Dashboard - AI Cellmate" },
-    { name: "description", content: "View and manage your CSV data enrichment projects with AI-powered intelligence." },
+    {
+      name: "description",
+      content:
+        "View and manage your CSV data enrichment projects with AI-powered intelligence.",
+    },
   ];
 };
 
@@ -52,15 +56,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const orgId = await getActiveOrganizationId(request);
     UNSAFE_invariant(orgId, "No organization id found");
 
-    // Validate subscription and credits before AI generation
-    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
+    // Validate credits before AI generation (1 credit for column generation)
+    const validation = await validateSubscriptionAndCredits(request, orgId, 1);
 
     if (!validation.valid) {
       return await redirectWithToast(ROUTES.DASHBOARD, {
         type: "error",
         description:
-          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
-        title: "No subscription or credits left",
+          "You are out of credits. Please update your billing before continuing.",
+        title: "Insufficient credits",
       });
     }
 
@@ -85,18 +89,6 @@ export async function action({ request }: ActionFunctionArgs) {
   if (intent === "upload-csv") {
     const orgId = await getActiveOrganizationId(request);
     UNSAFE_invariant(orgId, "No organization id found while uploading CSV");
-
-    // Server-side validation - check if user has subscription and at least 10 credits
-    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
-
-    if (!validation.valid) {
-      return await redirectWithToast(ROUTES.DASHBOARD, {
-        type: "error",
-        description:
-          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
-        title: "No subscription or credits left",
-      });
-    }
 
     const session = await requireUser(request);
     UNSAFE_invariant(session.user, "No user found");
@@ -127,6 +119,29 @@ export async function action({ request }: ActionFunctionArgs) {
       });
     }
 
+    // Calculate required credits based on CSV size
+    // Credits needed = number of rows * number of enrichment columns
+    const csvContent = await file.text();
+    const rows = csvContent.trim().split("\n");
+    // Subtract 1 for header row
+    const rowCount = Math.max(0, rows.length - 1);
+    const requiredCredits = rowCount * enrichmentColumns.length;
+
+    // Validate credits based on CSV size
+    const validation = await validateSubscriptionAndCredits(
+      request,
+      orgId,
+      requiredCredits,
+    );
+
+    if (!validation.valid) {
+      return await redirectWithToast(ROUTES.DASHBOARD, {
+        type: "error",
+        description: `You need ${requiredCredits} credits to enrich this CSV (${rowCount} rows × ${enrichmentColumns.length} columns), but don't have enough. Please update your billing before continuing.`,
+        title: "Insufficient credits",
+      });
+    }
+
     try {
       const tableId = await uploadAndProcessCSV({
         file,
@@ -152,16 +167,15 @@ export async function action({ request }: ActionFunctionArgs) {
     const orgId = await getActiveOrganizationId(request);
     UNSAFE_invariant(orgId, "No organization id found while adding new data");
 
-    // Server-side validation - check if user has subscription and at least 10 credits
-    const validation = await validateSubscriptionAndCredits(request, orgId, 10);
+    // Validate credits before showing upload modal
+    const validation = await validateSubscriptionAndCredits(request, orgId, 1);
 
     if (!validation.valid) {
-      // return data({ error: validation.error }, { status: 400 });
       return await redirectWithToast(ROUTES.DASHBOARD, {
         type: "error",
         description:
-          "You do not have valid subscription. Or you are out of credits. Please update your billing before continuing.",
-        title: "No subscription or credits left",
+          "You are out of credits. Please update your billing before continuing.",
+        title: "Insufficient credits",
       });
     }
 

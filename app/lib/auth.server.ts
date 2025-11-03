@@ -81,6 +81,22 @@ export const auth = betterAuth({
               stripeCustomerId: customer.id,
             },
           });
+
+          // Grant 10 free credits only to the user's first organization
+          // Count how many organizations this user is a member of (via Member table)
+          const userMemberCount = await prisma.member.count({
+            where: { userId: user.id },
+          });
+
+          // If this is the first organization (count === 1, just created), grant 10 credits
+          const creditAmount = userMemberCount === 1 ? 10 : 0;
+
+          await prisma.credits.create({
+            data: {
+              organizationId: organization.id,
+              amount: creditAmount,
+            },
+          });
         },
       },
     }),
