@@ -367,6 +367,13 @@ export default function CSVView() {
               description: "The enrichment process was cancelled.",
             });
             break;
+
+          case "insufficient-credits":
+            setProcessingRowId(null);
+            toast.error("Insufficient credits", {
+              description: "You have run out of credits. Please purchase more to continue enrichment.",
+            });
+            break;
         }
       } catch (e) {
         console.error("Failed to parse SSE event:", e);

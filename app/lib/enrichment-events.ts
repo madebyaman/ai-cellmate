@@ -77,6 +77,13 @@ export interface CancelledEvent {
   timestamp: string;
 }
 
+export interface InsufficientCreditsEvent {
+  type: "insufficient-credits";
+  message: string;
+  creditsRemaining: number;
+  timestamp: string;
+}
+
 export type EnrichmentEvent =
   | RowStartEvent
   | StageStartEvent
@@ -87,7 +94,8 @@ export type EnrichmentEvent =
   | RowFailedEvent
   | RowSkippedEvent
   | CompleteEvent
-  | CancelledEvent;
+  | CancelledEvent
+  | InsufficientCreditsEvent;
 
 /**
  * Helper function to create enrichment events with timestamp

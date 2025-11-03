@@ -66,6 +66,48 @@ export async function getOrganizationCredits(request: Request, orgId: string) {
   return credits?.amount ?? 0;
 }
 
+export async function deductCredits(
+  orgId: string,
+  amount: number,
+): Promise<{ success: boolean; newBalance?: number; error?: string }> {
+  const { prisma } = await import("~/lib/prisma.server");
+
+  try {
+    // Get current balance
+    const currentCredits = await prisma.credits.findUnique({
+      where: { organizationId: orgId },
+      select: { amount: true },
+    });
+
+    if (!currentCredits) {
+      return { success: false, error: "Credits not found for organization" };
+    }
+
+    const newBalance = currentCredits.amount - amount;
+
+    // Prevent negative credits
+    if (newBalance < 0) {
+      return {
+        success: false,
+        error: "Insufficient credits",
+        newBalance: currentCredits.amount,
+      };
+    }
+
+    // Atomically update credits
+    const updated = await prisma.credits.update({
+      where: { organizationId: orgId },
+      data: { amount: newBalance },
+      select: { amount: true },
+    });
+
+    return { success: true, newBalance: updated.amount };
+  } catch (error) {
+    console.error("Error deducting credits:", error);
+    return { success: false, error: "Failed to deduct credits" };
+  }
+}
+
 export type SubscriptionError = "invalid-sub" | "out-of-credits";
 
 export async function validateSubscriptionAndCredits(

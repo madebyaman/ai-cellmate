@@ -27,6 +27,7 @@ interface AgentLoopResult {
   cycles: number;
   usages: any[];
   success: boolean;
+  filledCellsCount: number;
 }
 
 export const runAgentLoop = async (
@@ -349,11 +350,25 @@ export const runAgentLoop = async (
   const totalColumns = headers.length;
   const filledCount = totalColumns - missingCount;
 
+  // Count how many cells were actually filled during this enrichment
+  // (cells that were empty/missing and are now filled)
+  let filledCellsCount = 0;
+  headers.forEach((header) => {
+    const originalValue = row[header];
+    const newValue = finalRow[header];
+    const wasEmpty = !originalValue || originalValue.trim() === "" || originalValue === "-";
+    const isNowFilled = newValue && newValue.trim() !== "" && newValue !== "-";
+    if (wasEmpty && isNowFilled) {
+      filledCellsCount++;
+    }
+  });
+
   console.log(
     `\n${rowPrefix} All cycles complete - Final success: ${missingCount === 0}`,
   );
   console.log(`${rowPrefix} Total cycles: ${totalCycles}`);
   console.log(`${rowPrefix} Filled: ${filledCount}/${totalColumns} columns`);
+  console.log(`${rowPrefix} Cells filled: ${filledCellsCount}`);
   console.log(
     `${rowPrefix} Missing: ${missingCount > 0 ? context.getMissingColumns().join(", ") : "none"}`,
   );
@@ -367,5 +382,6 @@ export const runAgentLoop = async (
       Object.keys(row).filter(
         (k) => !row[k] || row[k].trim() === "" || row[k] === "-",
       ).length, // Success if we filled at least some columns
+    filledCellsCount,
   };
 };

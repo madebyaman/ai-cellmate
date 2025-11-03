@@ -1,4 +1,4 @@
-import { Worker } from "bullmq";
+import { Worker, UnrecoverableError } from "bullmq";
 import { redisConnection } from "../config";
 import type {
   CsvEnrichmentJobData,
@@ -14,7 +14,11 @@ import { prisma } from "~/lib/prisma.server";
 import { updateCachedTable } from "~/lib/cached-table.server";
 import { publishEnrichmentEvent } from "~/lib/redis-event-publisher";
 import { createEnrichmentEvent } from "~/lib/enrichment-events";
-import { checkCancellationFlag, clearCancellationFlag } from "~/lib/enrichment-cancellation.server";
+import {
+  checkCancellationFlag,
+  clearCancellationFlag,
+} from "~/lib/enrichment-cancellation.server";
+import { deductCredits } from "~/utils/auth.server";
 
 const langfuse = new Langfuse({
   environment: process.env.NODE_ENV ?? "development",
@@ -45,7 +49,9 @@ export function createCsvEnrichmentWorker(): Worker<
           throw new Error(`Unknown CSV enrichment job type: ${job.name}`);
       }
     },
-    { connection: redisConnection },
+    {
+      connection: redisConnection,
+    },
   );
 }
 
@@ -123,6 +129,58 @@ async function processCsvEnrichment(
       `[TABLE HINT] Websites: ${tableHint.websites.join(", ") || "none"}`,
     );
 
+    // Get organization ID - first check if table has organizationId, otherwise query for it
+    let organizationId: string | undefined = run.table.organizationId;
+    if (!organizationId) {
+      const userMember = await prisma.member.findFirst({
+        where: { userId },
+        select: { organizationId: true },
+      });
+      organizationId = userMember?.organizationId;
+    }
+
+    if (!organizationId) {
+      throw new Error(
+        "Could not determine organization for this enrichment job",
+      );
+    }
+
+    console.log(`[CREDITS] Organization ID: ${organizationId}`);
+
+    // Check credits before starting enrichment
+    const currentCredits = await prisma.credits.findUnique({
+      where: { organizationId },
+      select: { amount: true },
+    });
+
+    const creditsBalance = currentCredits?.amount ?? 0;
+    console.log(`[CREDITS] Current balance: ${creditsBalance}`);
+
+    if (creditsBalance < 1) {
+      console.log(`[CREDITS] Insufficient credits - cancelling enrichment`);
+
+      // Update Run status to FAILED
+      await prisma.run.update({
+        where: { id: runId },
+        data: { status: "FAILED", finishedAt: new Date() },
+      });
+
+      // Publish insufficient-credits event
+      await publishEnrichmentEvent(
+        run.table.id,
+        createEnrichmentEvent("insufficient-credits", {
+          message: "You have insufficient credits to continue enrichment",
+          creditsRemaining: creditsBalance,
+        }),
+      );
+
+      console.log(`[CREDITS] Insufficient credits event published`);
+      await sdk.shutdown();
+
+      // Throw UnrecoverableError to prevent BullMQ from retrying
+      throw new UnrecoverableError("Insufficient credits for enrichment");
+    }
+
     // 5. Process each row
     for (let i = 0; i < run.table.rows.length; i++) {
       const row = run.table.rows[i];
@@ -130,7 +188,9 @@ async function processCsvEnrichment(
       // Check for cancellation before processing each row
       const isCancelled = await checkCancellationFlag(runId);
       if (isCancelled) {
-        console.log(`[CANCELLATION] Detected for run ${runId}, stopping enrichment`);
+        console.log(
+          `[CANCELLATION] Detected for run ${runId}, stopping enrichment`,
+        );
 
         // Update Run status to CANCELLED
         await prisma.run.update({
@@ -146,7 +206,7 @@ async function processCsvEnrichment(
           run.table.id,
           createEnrichmentEvent("cancelled", {
             reason: "Cancelled by user",
-          })
+          }),
         );
 
         console.log(`[CANCELLATION] Run ${runId} cancelled successfully`);
@@ -164,6 +224,44 @@ async function processCsvEnrichment(
       console.log(
         `\n[ROW ${i + 1}/${run.table.rows.length}] Starting enrichment`,
       );
+
+      // Check credits before processing each row
+      const rowCredits = await prisma.credits.findUnique({
+        where: { organizationId },
+        select: { amount: true },
+      });
+
+      const rowCreditsBalance = rowCredits?.amount ?? 0;
+      console.log(`[CREDITS] Pre-row check - Balance: ${rowCreditsBalance}`);
+
+      if (rowCreditsBalance < 1) {
+        console.log(
+          `[CREDITS] Insufficient credits at row ${i + 1} - stopping enrichment`,
+        );
+
+        // Update Run status to FAILED
+        await prisma.run.update({
+          where: { id: runId },
+          data: { status: "FAILED", finishedAt: new Date() },
+        });
+
+        // Publish insufficient-credits event
+        await publishEnrichmentEvent(
+          run.table.id,
+          createEnrichmentEvent("insufficient-credits", {
+            message: "You have insufficient credits to continue enrichment",
+            creditsRemaining: rowCreditsBalance,
+          }),
+        );
+
+        console.log(
+          `[CREDITS] Insufficient credits event published for row ${i + 1}`,
+        );
+        await sdk.shutdown();
+
+        // Throw UnrecoverableError to prevent BullMQ from retrying
+        throw new UnrecoverableError("Insufficient credits for enrichment");
+      }
 
       // Build row context from SOURCE columns
       const rowContext: Record<string, string> = {};
@@ -220,7 +318,7 @@ async function processCsvEnrichment(
         createEnrichmentEvent("row-start", {
           rowId: row.id,
           rowPosition: row.position,
-        })
+        }),
       );
       console.log(`[PUBLISH] row-start event sent successfully`);
 
@@ -269,13 +367,35 @@ async function processCsvEnrichment(
           `[ROW ${i + 1}/${run.table.rows.length}] Filled: ${filledCount}/${enrichmentColumnNames.length} columns`,
         );
 
+        // Deduct credits for filled cells
+        const cellsFilledCount = agentResult.filledCellsCount || 0;
+        if (cellsFilledCount > 0) {
+          console.log(
+            `[CREDITS] Deducting ${cellsFilledCount} credit(s) for ${cellsFilledCount} filled cell(s)`,
+          );
+          const deductResult = await deductCredits(
+            organizationId,
+            cellsFilledCount,
+          );
+          if (deductResult.success) {
+            console.log(
+              `[CREDITS] Deduction successful - New balance: ${deductResult.newBalance}`,
+            );
+          } else {
+            console.error(`[CREDITS] Deduction failed: ${deductResult.error}`);
+            // If deduction fails, still continue but log the issue
+          }
+        } else {
+          console.log(`[CREDITS] No cells filled - no credits deducted`);
+        }
+
         // Emit stage-start for "Saving"
         console.log(`[PUBLISH] stage-start - Saving`);
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("stage-start", {
             stage: "Saving",
-          })
+          }),
         );
         console.log(`[PUBLISH] stage-start (Saving) event sent successfully`);
 
@@ -300,7 +420,9 @@ async function processCsvEnrichment(
               );
 
               // Emit cell-update event
-              console.log(`[PUBLISH] cell-update - Row ${row.position}, Column ${enrichmentCol.name}`);
+              console.log(
+                `[PUBLISH] cell-update - Row ${row.position}, Column ${enrichmentCol.name}`,
+              );
               await publishEnrichmentEvent(
                 run.table.id,
                 createEnrichmentEvent("cell-update", {
@@ -308,7 +430,7 @@ async function processCsvEnrichment(
                   columnId: enrichmentCol.id,
                   columnName: enrichmentCol.name,
                   value: value,
-                })
+                }),
               );
               console.log(`[PUBLISH] cell-update event sent successfully`);
             }
@@ -321,12 +443,16 @@ async function processCsvEnrichment(
           run.table.id,
           createEnrichmentEvent("stage-complete", {
             stage: "Saving",
-          })
+          }),
         );
-        console.log(`[PUBLISH] stage-complete (Saving) event sent successfully`);
+        console.log(
+          `[PUBLISH] stage-complete (Saving) event sent successfully`,
+        );
 
         // Emit row-complete event
-        console.log(`[PUBLISH] row-complete - Row ${row.position} (${row.id}), filled ${filledCount}/${enrichmentColumnNames.length}`);
+        console.log(
+          `[PUBLISH] row-complete - Row ${row.position} (${row.id}), filled ${filledCount}/${enrichmentColumnNames.length}`,
+        );
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("row-complete", {
@@ -334,7 +460,7 @@ async function processCsvEnrichment(
             rowPosition: row.position,
             columnsFilled: filledCount,
             columnsTotal: enrichmentColumnNames.length,
-          })
+          }),
         );
         console.log(`[PUBLISH] row-complete event sent successfully`);
 
@@ -346,25 +472,26 @@ async function processCsvEnrichment(
           },
         });
       } catch (error) {
-        console.error(
-          `[ROW ${i + 1}/${run.table.rows.length}] ERROR:`,
-          error,
-        );
+        console.error(`[ROW ${i + 1}/${run.table.rows.length}] ERROR:`, error);
 
         // Emit row-failed event
-        console.log(`[PUBLISH] row-failed - Row ${row.position} (${row.id}), reason: ${error instanceof Error ? error.message : "Unknown error"}`);
+        console.log(
+          `[PUBLISH] row-failed - Row ${row.position} (${row.id}), reason: ${error instanceof Error ? error.message : "Unknown error"}`,
+        );
         await publishEnrichmentEvent(
           run.table.id,
           createEnrichmentEvent("row-failed", {
             rowId: row.id,
             rowPosition: row.position,
             reason: error instanceof Error ? error.message : "Unknown error",
-          })
+          }),
         );
         console.log(`[PUBLISH] row-failed event sent successfully`);
 
         rowTrace.update({
-          metadata: { error: error instanceof Error ? error.message : "Unknown error" },
+          metadata: {
+            error: error instanceof Error ? error.message : "Unknown error",
+          },
         });
       }
     }
@@ -385,7 +512,7 @@ async function processCsvEnrichment(
     console.log(`[PUBLISH] complete - All rows processed`);
     await publishEnrichmentEvent(
       run.table.id,
-      createEnrichmentEvent("complete", {})
+      createEnrichmentEvent("complete", {}),
     );
     console.log(`[PUBLISH] complete event sent successfully`);
 
@@ -401,21 +528,26 @@ async function processCsvEnrichment(
   } catch (error) {
     console.error(`[RUN FAILED] Error:`, error);
 
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
+
     // Update Run status to FAILED
     await prisma.run.update({
       where: { id: runId },
       data: {
         status: "FAILED",
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: errorMessage,
         finishedAt: new Date(),
       },
     });
 
     await sdk.shutdown();
 
-    throw new Error(
-      `CSV enrichment failed: ${error instanceof Error ? error.message : "Unknown error"}`,
-    );
+    // Re-throw the error (UnrecoverableError will prevent retries by BullMQ)
+    if (error instanceof UnrecoverableError) {
+      throw error;
+    }
+
+    throw new Error(`CSV enrichment failed: ${errorMessage}`);
   }
 }
-
